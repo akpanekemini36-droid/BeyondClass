@@ -864,6 +864,12 @@
 
   /* FOOTER */
   footer {
+    --bg: #000000;
+    --ink: #FFFFFF;
+    --ink-soft: #DDDDDD;
+    --line-soft: #444444;
+    background: var(--bg);
+    color: var(--ink);
     padding: 40px 0;
   }
   .footer-inner {
