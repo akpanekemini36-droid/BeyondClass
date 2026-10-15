@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light only">
+  <title>Owner inbox | BeyondClass Math</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/inbox.js" defer></script>
+</head>
+<body class="inbox-page">
+<header class="inbox-header wrap"><a href="index.html" class="brand"><span class="logo-mark" aria-hidden="true"></span> BeyondClass Math</a><a href="index.html">Back to the website</a></header>
+<main class="wrap inbox-main" id="main">
+  <span class="kicker">For the owner</span><h1>Parent requests, all in one place.</h1>
+  <p id="inboxStatus" role="status" class="inbox-status"></p>
+  <section id="inboxLogin" class="inbox-login-panel">
+    <h2>Sign in to your inbox</h2><p>View materials requests and free-trial bookings sent through the website.</p>
+    <form id="inboxLoginForm" class="booking" method="post">
+      <div class="field"><label for="inboxPassword">Inbox password</label><input type="password" id="inboxPassword" name="password" autocomplete="current-password" required maxlength="256"></div>
+      <button type="submit" disabled class="submit-btn">Sign in</button>
+    </form>
+  </section>
+  <section id="inboxContent" hidden>
+    <section class="inbox-analytics" aria-labelledby="analyticsHeading">
+      <div class="analytics-heading"><div><span class="kicker">Website activity</span><h2 id="analyticsHeading">Your website’s page views.</h2></div><div class="field"><label for="analyticsDays">Show</label><select id="analyticsDays"><option value="30">Last 30 days</option><option value="7">Last 7 days</option></select></div></div>
+      <p class="payment-note">Anonymous page views, counted in UTC. These are page loads, so the same person can contribute more than one view.</p>
+      <p id="analyticsStatus" role="status"></p>
+      <div id="analyticsSummary" hidden>
+        <div class="analytics-totals"><div><span>Today</span><strong id="analyticsToday">0</strong></div><div><span id="analyticsPeriodLabel">Last 30 days</span><strong id="analyticsTotal">0</strong></div></div>
+        <div id="analyticsChart" class="analytics-chart" role="img" aria-label="Daily page views"></div>
+        <p id="analyticsDateRange" class="analytics-date-range"></p>
+        <div class="analytics-table-wrap"><table class="analytics-table"><caption>Views by page</caption><thead><tr><th scope="col">Page</th><th scope="col">Views</th></tr></thead><tbody id="analyticsPageRows"></tbody></table></div>
+      </div>
+    </section>
+    <div class="inbox-toolbar"><p id="inboxCount"></p><div class="page-actions"><button type="button" class="btn-secondary" id="refreshInbox">Refresh</button><button type="button" class="btn-secondary" id="logoutInbox">Sign out</button></div></div>
+    <div class="inbox-filters"><div><label for="inboxKind">Request type</label><select id="inboxKind"><option value="">All requests</option><option value="materials">Free materials</option><option value="trial">Trial bookings</option></select></div><label class="checkbox-label"><input id="inboxUnread" type="checkbox"> New requests only</label></div>
+    <p class="payment-note">Times shown in Lagos time. Open a request to read the full details.</p>
+    <div id="requestList" class="inbox-list"></div>
+    <div class="inbox-pagination"><button type="button" class="btn-secondary" id="previousInboxPage">Previous</button><span id="inboxPageLabel"></span><button type="button" class="btn-secondary" id="nextInboxPage">Next</button></div>
+    <details class="inbox-password-panel" id="passwordSettings"><summary>Change your inbox password</summary><form id="changeInboxPassword" class="booking" method="post"><div class="field"><label for="currentInboxPassword">Current password</label><input type="password" id="currentInboxPassword" autocomplete="current-password" required maxlength="256"></div><div class="field"><label for="newInboxPassword">New password (at least 12 characters)</label><input type="password" id="newInboxPassword" autocomplete="new-password" minlength="12" maxlength="256" required></div><button type="submit" disabled class="submit-btn">Change password</button></form></details>
+  </section>
+  <noscript><p>Please enable JavaScript to sign in and manage requests.</p></noscript>
+</main>
+</body>
+</html>

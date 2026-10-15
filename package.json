@@ -1,0 +1,18 @@
+{
+  "name": "beyondclass-math",
+  "private": true,
+  "version": "1.0.0",
+  "description": "BeyondClass Math website and private parent-request inbox",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "build": "node scripts/build.cjs",
+    "configure-site": "node scripts/configure-site.cjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "11.1.4"
+  }
+}
