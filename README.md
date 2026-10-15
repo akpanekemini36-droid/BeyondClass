@@ -32,7 +32,7 @@ The owner inbox also shows anonymous page counts for the last 7 or 30 UTC days. 
 - `privacy.html`: Child protection and privacy
 - `inbox.html`: Password-protected owner inbox for materials requests and trial bookings
 
-Shared design and behavior are in `assets/site.css` and `assets/site.js`. Comic Sans is the preferred font, with the original embedded Comic Neue fallback for devices without Comic Sans. The design stays black and white, including gradients, and respects reduced motion preferences.
+Shared design and behavior are in `assets/site.css` and `assets/site.js`. Comic Relief is embedded in regular and bold weights and used first on every device for a consistent, close match to Comic Sans. The font loads from the website stylesheet without a third-party font service or an installed-font requirement. Comic Sans is a fallback only. Font source: https://github.com/loudifier/Comic-Relief (SIL Open Font License 1.1; the complete copyright and license notice is included in assets/site.css). The design stays black and white, including gradients, and respects reduced motion preferences.
 
 Each photo has a single placement: the supplied online tutor on Home, the original exam photo on Our Tutors, the original study-desk photo on Resources, and Ekemini Akpan’s small portrait in the founder section on About. Main photos span the full page width with text over a dark gradient; photography is presented in monochrome to match the brand. Original image files are preserved in `assets/images`. The original math patterns are shared through `assets/math-pattern.svg` and `assets/math-pattern-dark.svg`, with the light pattern layered over content-section gradients. Page headers use the clean black gradient.
 
