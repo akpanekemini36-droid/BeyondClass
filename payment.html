@@ -59,20 +59,63 @@
 <main id="main"><div id="top"></div>
 <section class="page-hero"><div class="wrap"><nav class="breadcrumb" aria-label="Breadcrumb"><a href="index.html">Home</a><span aria-hidden="true">/</span><span aria-current="page">Payment</span></nav><h1>The next step in their progress.</h1><p>Choose your tutoring plan and review payment details.</p></div></section>
 <section id="payment"><div class="wrap contact-grid">
-<form class="booking" id="checkoutForm" aria-labelledby="checkoutHeading">
+<div class="payment-options">
+<ol class="payment-steps" aria-label="How payment works">
+<li><strong>Confirm your plan</strong><span>Agree the lesson dates, lesson count and amount with us.</span></li>
+<li><strong>Make the transfer</strong><span>Use Cleva for USD or OPay for NGN in your bank app.</span></li>
+<li><strong>Send your notice</strong><span>We verify within 24 hours after the funds arrive and you send the notice.</span></li>
+</ol>
+<form class="booking" id="checkoutForm" method="post" aria-labelledby="checkoutHeading">
 <h2 id="checkoutHeading">Review your plan.</h2>
 <div class="field"><label for="checkoutPlan">Tutoring plan</label><select id="checkoutPlan" name="plan"><option value="Flexible" selected>Flexible — Best plan</option><option>Premium</option><option>Growth</option><option>Starter</option><option>Confidence Week</option></select></div>
 <div class="field"><label for="checkoutCurrency">Currency</label><select id="checkoutCurrency" name="currency"><option value="USD">US Dollar (USD)</option><option value="NGN">Nigerian Naira (NGN)</option></select></div>
-<p>When checkout is available for your selection, you’ll continue to Stripe to complete payment.</p>
-<button type="submit" class="submit-btn" id="checkoutButton" disabled>Online checkout coming soon</button>
-<p id="checkoutStatus" class="form-status visible" role="status">Online payments are not available yet. Contact us to arrange enrollment or book a free trial.</p>
+<p id="selectedPaymentPrice" class="selected-payment-price" aria-live="polite">$160 / calendar month</p>
+<p id="cardCheckoutDescription" hidden>Pay by card through Stripe, or use the bank details below for your selected currency.</p>
+<button type="submit" class="submit-btn" id="checkoutButton" hidden disabled>Continue to Stripe checkout</button>
+<p id="checkoutStatus" class="form-status visible" role="status">Pay in US dollars using the bank details below. Confirm your enrollment and amount before transferring.</p>
 <p><a id="checkoutContact" href="contact.html?plan=Flexible#contact">Contact us about this plan</a></p>
 <noscript><p>Enable JavaScript to review your selection. You can also <a href="contact.html">contact us</a> about enrollment and payment.</p></noscript>
 </form>
+<section id="bankTransfer" class="bank-transfer" aria-labelledby="bankTransferHeading">
+<span class="kicker" id="bankTransferCurrency">USD bank transfer</span>
+<h2 id="bankTransferHeading">Pay with the Cleva bank details.</h2>
+<p class="bank-amount" aria-live="polite"><span id="bankSelectedPlan">Flexible</span><strong id="bankSelectedAmount">$160 / calendar month</strong><span>Confirm the billing period and amount with us before transferring.</span></p>
+<p id="bankTransferInstructions">Copy these details into your bank or payment app and send US dollars by ACH or domestic wire. The transfer takes place in your bank app.</p>
+<dl class="bank-details">
+<div><dt>Account name</dt><dd><span id="bankAccountName">Ekemini Itoro Akpan</span><button type="button" class="copy-detail" data-copy-target="bankAccountName" aria-label="Copy account name" disabled>Copy</button></dd></div>
+<div><dt>Bank name</dt><dd><span id="bankName">Lead Bank</span><button type="button" class="copy-detail" data-copy-target="bankName" aria-label="Copy bank name" disabled>Copy</button></dd></div>
+<div><dt>Account number</dt><dd><span id="bankAccountNumber">212966404958</span><button type="button" class="copy-detail" data-copy-target="bankAccountNumber" aria-label="Copy account number" disabled>Copy</button></dd></div>
+<div id="bankRoutingRow"><dt>Routing number</dt><dd><span id="bankRoutingNumber">101019644</span><button type="button" class="copy-detail" data-copy-target="bankRoutingNumber" aria-label="Copy routing number" disabled>Copy</button></dd></div>
+<div id="bankAccountTypeRow"><dt>Account type</dt><dd><span id="bankAccountType">Personal Checking</span></dd></div>
+<div id="bankAddressRow"><dt>Account address</dt><dd><span id="bankAccountAddress">9450 Southwest Gemini Drive, Beaverton, OR, 97008, USA</span><button type="button" class="copy-detail" data-copy-target="bankAccountAddress" aria-label="Copy account address" disabled>Copy</button></dd></div>
+</dl>
+<p id="bankCopyStatus" class="payment-note" role="status" aria-live="polite"></p>
+<p class="payment-note" id="bankTransferNote">These details are for USD transfers only. If your bank asks for a SWIFT code, contact us before sending. Check any fees with your bank or payment provider.</p>
+<p class="payment-note" id="clevaGuidance"><a href="https://help.getcleva.com/en/articles/10202343-faqs-on-swift-transfers" target="_blank" rel="noopener noreferrer">Cleva’s ACH and wire transfer guidance</a></p>
+<details class="transfer-notice">
+<summary>I’ve sent my transfer</summary>
+<form class="booking" id="transferNoticeForm" method="post" aria-labelledby="transferNoticeHeading">
+<h3 id="transferNoticeHeading">Let us know so we can check.</h3>
+<p>Selected plan: <strong id="transferPlan">Flexible</strong>. Submit this notice after making your transfer. We’ll check the receiving account and email you within 24 hours after the funds arrive and we receive your notice.</p>
+<div hidden aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+<div class="field"><label for="transferParentName">Your name</label><input id="transferParentName" name="parentName" autocomplete="name" required maxlength="100"></div>
+<div class="field"><label for="transferEmail">Email address</label><input type="email" id="transferEmail" name="email" autocomplete="email" required maxlength="254"></div>
+<div class="field"><label for="transferAmount" id="transferAmountLabel">Amount you sent (USD)</label><input type="number" id="transferAmount" name="amount" min="0.01" max="99999.99" step="0.01" inputmode="decimal" value="160" required aria-describedby="transferAmountHelp"><p id="transferAmountHelp" class="payment-note">Enter the amount actually sent, including an agreed part payment if applicable.</p></div>
+<div class="field"><label for="transferReference">Transfer reference or name on the sending account</label><input id="transferReference" name="transferReference" required maxlength="160" autocomplete="off"></div>
+<div class="field"><label for="transferMessage">Notes (optional)</label><textarea id="transferMessage" name="message" maxlength="1000" placeholder="For example, the billing period this transfer covers."></textarea></div>
+<p class="payment-note">This sends a notice to our private inbox. It does not confirm receipt of money or activate lessons automatically. Please keep your bank receipt.</p>
+<button type="submit" class="submit-btn" disabled>Send transfer notice</button>
+<p id="transferNoticeStatus" class="form-status" role="status"></p>
+<noscript><p>Enable JavaScript to send a transfer notice, or contact us directly.</p></noscript>
+</form>
+</details>
+</section>
+</div>
 <aside class="payment-summary" aria-labelledby="summaryHeading"><h2 id="summaryHeading">Your selection</h2>
-<div aria-live="polite" aria-atomic="true"><dl><dt>Plan</dt><dd id="summaryPlan">Flexible</dd><dt>Listed price</dt><dd id="summaryPrice">$200 / month</dd></dl><p id="summaryDetail">3 lessons per week for a month, 1 hour 30 minutes each, with all Premium benefits, flexible rescheduling and an optional monthly parent call.</p></div>
+<div aria-live="polite" aria-atomic="true"><dl><dt>Plan</dt><dd id="summaryPlan">Flexible</dd><dt>Listed price</dt><dd id="summaryPrice">$160 / calendar month</dd></dl><p id="summaryDetail">Three 90-minute lessons per week during the calendar month. Confirm the billing dates and exact lesson count before payment. All Premium benefits, flexible rescheduling, limited tutor-approved extra lessons and an optional monthly parent call.</p></div>
 <p class="payment-note">Confirm your enrollment and billing period with us before paying. A 50% part payment secures your spot once you have chosen your plan.</p>
 <p class="payment-note">For part payments or a quote in Pounds, <a href="contact.html">contact us</a>. The Confidence Week deposit has its own terms on the Pricing page.</p>
+<p class="payment-note">Rescheduling requires at least two hours’ notice. <a href="pricing.html#lesson-terms">Read lesson and billing terms</a>.</p>
 <a href="pricing.html" class="btn-secondary">Compare all plans</a></aside>
 </div></section>
 </main>

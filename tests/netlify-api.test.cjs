@@ -39,6 +39,256 @@ function fixture({ password = PASSWORD, store = memoryStore() } = {}) {
 }
 const material = extra => ({ kind: 'materials', requestToken: crypto.randomBytes(16).toString('hex'), email: 'parent@example.invalid', grade: 'Year 7', topic: 'Fractions', ...extra });
 
+test('saved requests and read counts recover from failed index writes without a parent retry', async () => {
+  for (const mode of ['throw', 'conflict']) {
+    const f = fixture(), cookie = await f.login();
+    await f.request('/api/inbox/requests', { cookie });
+    const original = f.store.setJSON;
+    let broken = true;
+    f.store.setJSON = async function (key, ...args) {
+      if (key === 'request-index/v1' && broken) {
+        if (mode === 'conflict') return { modified: false };
+        throw new Error('Synthetic index failure');
+      }
+      return original.call(this, key, ...args);
+    };
+    const sent = await f.request('/api/requests', { method: 'POST', body: material() });
+    assert.equal(sent.status, 201);
+    assert([...f.store.values.keys()].some(key => key.startsWith('request-index-pending/')));
+    assert.equal((await f.request('/api/inbox/requests', { cookie })).status, 503, 'must not show a false empty inbox');
+    broken = false;
+    const next = fixture({ store: f.store });
+    const listed = await next.request('/api/inbox/requests', { cookie });
+    assert.equal(listed.json.total, 1);
+    assert.equal(listed.json.unreadCount, 1);
+    assert.equal(listed.json.requests[0].reference, sent.json.reference);
+    assert(![...f.store.values.keys()].some(key => key.startsWith('request-index-pending/')));
+    broken = true;
+    const patch = await next.request('/api/inbox/requests/' + listed.json.requests[0].id, { method: 'PATCH', cookie, body: { status: 'read' } });
+    assert.equal(patch.status, 200);
+    assert.equal(patch.json.status, 'read');
+    assert.equal((await next.request('/api/inbox/requests?unread=1', { cookie })).status, 503);
+    broken = false;
+    const repaired = await f.request('/api/inbox/requests?unread=1', { cookie });
+    assert.equal(repaired.json.total, 0);
+    assert.equal(repaired.json.unreadCount, 0);
+  }
+});
+
+test('a committed request/status followed by a storage error is reconciled automatically', async () => {
+  const f = fixture(), cookie = await f.login();
+  await f.request('/api/inbox/requests', { cookie });
+  const original = f.store.setJSON;
+  let failAfterWrite = true;
+  f.store.setJSON = async function (key, ...args) {
+    const result = await original.call(this, key, ...args);
+    if (key.startsWith('requests/') && failAfterWrite) throw new Error('Synthetic lost write acknowledgement');
+    return result;
+  };
+  assert.equal((await f.request('/api/requests', { method: 'POST', body: material() })).status, 503);
+  failAfterWrite = false;
+  const saved = await f.request('/api/inbox/requests', { cookie });
+  assert.equal(saved.json.total, 1);
+  assert.equal(saved.json.unreadCount, 1);
+  failAfterWrite = true;
+  assert.equal((await f.request('/api/inbox/requests/' + saved.json.requests[0].id, { method: 'PATCH', cookie, body: { status: 'read' } })).status, 503);
+  failAfterWrite = false;
+  const corrected = await f.request('/api/inbox/requests', { cookie });
+  assert.equal(corrected.json.requests[0].status, 'read');
+  assert.equal(corrected.json.unreadCount, 0);
+});
+
+test('repair markers must be durable before mutation; aborted and in-flight operations are safe', async () => {
+  const f = fixture(), cookie = await f.login();
+  await f.request('/api/inbox/requests', { cookie });
+  const original = f.store.setJSON;
+  let broken = true;
+  f.store.setJSON = async function (key, ...args) {
+    if (key.startsWith('request-index-pending/') && broken) throw new Error('Synthetic marker failure');
+    return original.call(this, key, ...args);
+  };
+  assert.equal((await f.request('/api/requests', { method: 'POST', body: material() })).status, 503);
+  assert(![...f.store.values.keys()].some(key => key.startsWith('requests/')));
+  broken = false;
+  const { createRequestIndex } = require('../lib/request-index.cjs');
+  const index = createRequestIndex(f.store);
+  const pending = await index.prepare('a'.repeat(64));
+  assert.equal((await f.request('/api/inbox/requests', { cookie })).json.total, 0);
+  assert(f.store.values.has(pending), 'in-flight marker must remain when the row is not yet visible');
+  const old = 'request-index-pending/' + 'b'.repeat(64) + '/old';
+  await f.store.setJSON(old, { id: 'b'.repeat(64), createdAt: Date.now() - 86400001 });
+  await index.reconcile();
+  assert(!f.store.values.has(old));
+  assert(f.store.values.has(pending));
+});
+
+test('old indexes recover invisible records and stale counts on upgrade; scheduled repair catches unmarked orphans', async () => {
+  const f = fixture(), id = 'c'.repeat(64);
+  const row = { id, reference: 'SYNTHETIC', kind: 'materials', status: 'read', revision: 1, created_at: new Date().toISOString(), details: { topic: 'Test' } };
+  await f.store.setJSON('requests/' + id, row);
+  await f.store.setJSON('request-index/v1', { entries: [] });
+  const cookie = await f.login();
+  const recovered = await f.request('/api/inbox/requests', { cookie });
+  assert.equal(recovered.json.total, 1);
+  assert.equal(recovered.json.unreadCount, 0);
+  const another = { ...row, id: 'd'.repeat(64), status: 'new', revision: 0 };
+  await f.store.setJSON('requests/' + another.id, another);
+  const { createRequestIndex } = require('../lib/request-index.cjs');
+  await createRequestIndex(f.store).reconcile();
+  const all = await f.request('/api/inbox/requests', { cookie });
+  assert.equal(all.json.total, 2);
+  assert.equal(all.json.unreadCount, 1);
+});
+
+test('an older repair cannot remove a newer pending operation or overwrite its status', async () => {
+  const store = memoryStore(), id = 'e'.repeat(64);
+  await store.setJSON('request-index/v1', { schemaVersion: 2, entries: [] });
+  const { createRequestIndex } = require('../lib/request-index.cjs');
+  const first = createRequestIndex(store), second = createRequestIndex(store);
+  const oldMarker = await first.prepare(id);
+  const row = { id, kind: 'trial', status: 'read', revision: 1, created_at: new Date().toISOString() };
+  await store.setJSON('requests/' + id, row);
+  const originalGet = store.get, originalSet = store.setJSON;
+  let release, paused = false, failIndex = false;
+  store.get = async function (key, ...args) {
+    const value = await originalGet.call(this, key, ...args);
+    if (key === 'requests/' + id && !paused) { paused = true; return new Promise(resolve => { release = () => resolve(value); }); }
+    return value;
+  };
+  const oldRepair = first.tryCommit(oldMarker);
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  const newMarker = await second.prepare(id);
+  await store.setJSON('requests/' + id, { ...row, status: 'new', revision: 2 });
+  store.setJSON = async function (key, ...args) {
+    if (key === 'request-index/v1' && failIndex) throw new Error('Synthetic failure');
+    return originalSet.call(this, key, ...args);
+  };
+  failIndex = true;
+  assert.equal(await second.tryCommit(newMarker), false);
+  failIndex = false;
+  release(); await oldRepair;
+  assert(store.values.has(newMarker));
+  const result = await second.page({ page: 1, kind: '', unread: false });
+  assert.equal(result.unreadCount, 1);
+  assert.equal(result.requests[0].status, 'new');
+  assert(!store.values.has(newMarker));
+});
+
+test('an inbox read cannot consume a status repair marker before its record write commits', async () => {
+  const store = memoryStore(), id = 'f'.repeat(64);
+  const { createRequestIndex } = require('../lib/request-index.cjs');
+  const index = createRequestIndex(store);
+  const row = { id, kind: 'trial', status: 'new', revision: 0, created_at: new Date().toISOString() };
+  await store.setJSON('requests/' + id, row);
+  await index.upsert(row);
+  const pending = await index.prepare(id, 1);
+  const before = await index.page({ page: 1, kind: '', unread: false });
+  assert.equal(before.unreadCount, 1);
+  assert(store.values.has(pending), 'marker must survive while only the previous row revision exists');
+  await store.setJSON('requests/' + id, { ...row, status: 'read', revision: 1 });
+  const after = await index.page({ page: 1, kind: '', unread: false });
+  assert.equal(after.unreadCount, 0);
+  assert.equal(after.requests[0].status, 'read');
+  assert(!store.values.has(pending));
+});
+
+test('hosting routes isolate logout from the Netlify function rate limit', async () => {
+  const main = await import('../netlify/functions/api.mjs');
+  const logout = await import('../netlify/functions/logout.mjs');
+  assert.equal(main.config.excludedPath, '/api/inbox/logout');
+  assert.equal(logout.config.path, '/api/inbox/logout');
+  assert.equal(logout.config.method, 'POST');
+  assert.equal(logout.config.rateLimit, undefined);
+  assert.equal(logout.default, main.default);
+});
+
+test('indexed inbox pagination reads at most the selected 30 request payloads after legacy migration', async () => {
+  const f = fixture();
+  for (let i = 0; i < 125; i++) {
+    const id = i.toString(16).padStart(64, '0');
+    await f.store.setJSON('requests/' + id, { id, reference: 'TEST-' + i, kind: i % 2 ? 'trial' : 'materials', status: i % 3 ? 'new' : 'read', created_at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString(), details: { name: 'Synthetic parent', topic: 'Test topic' } });
+  }
+  const cookie = await f.login();
+  assert.equal((await f.request('/api/inbox/requests', { cookie })).json.total, 125);
+  const reads = [], listCalls = [];
+  const originalGet = f.store.get, originalList = f.store.list;
+  f.store.get = async function (key, ...args) { if (key.startsWith('requests/')) reads.push(key); return originalGet.call(this, key, ...args); };
+  f.store.list = function (options) { listCalls.push(options.prefix); return originalList.call(this, options); };
+  const next = fixture({ store: f.store });
+  const page = await next.request('/api/inbox/requests?page=2&kind=trial&unread=1', { cookie });
+  assert.equal(page.status, 200);
+  assert.equal(page.json.total, 41);
+  assert.equal(page.json.requests.length, 11);
+  assert.equal(reads.length, 11);
+  assert(!listCalls.includes('requests/'));
+  assert(page.json.requests.every(row => row.kind === 'trial' && row.status === 'new'));
+  assert(page.json.requests.every((row, i, rows) => !i || rows[i - 1].created_at >= row.created_at));
+  reads.length = 0;
+  const beyond = await next.request('/api/inbox/requests?page=999', { cookie });
+  assert.equal(beyond.json.requests.length, 0);
+  assert.equal(reads.length, 0);
+});
+
+test('expired-record cleanup removes only expired sessions and rate records, preserving requests and current counters', async () => {
+  const { cleanupExpiredRecords } = require('../lib/expired-records.cjs');
+  const store = memoryStore(), now = Date.UTC(2026, 9, 16);
+  for (const prefix of ['sessions/', 'rates/']) {
+    await store.setJSON(prefix + 'expired', { expires: now - 1 });
+    await store.setJSON(prefix + 'boundary', { expires: now });
+    await store.setJSON(prefix + 'active', { expires: now + 60000 });
+  }
+  await store.setJSON('requests/preserve', { expires: now - 1, details: { message: 'Keep this request' } });
+  await store.setJSON('auth/salt', { salt: 'synthetic' });
+  const result = await cleanupExpiredRecords(store, now);
+  assert.equal(result.removed, 4);
+  assert(store.values.has('sessions/active'));
+  assert(store.values.has('rates/active'));
+  assert(store.values.has('requests/preserve'));
+  assert(store.values.has('auth/salt'));
+  const scheduled = await import('../netlify/functions/cleanup.mjs');
+  assert.equal(scheduled.config.schedule, '*/15 * * * *');
+  assert.equal((await scheduled.default(null, { deploy: { context: 'deploy-preview' } })).status, 204);
+});
+
+test('request index revisions reject delayed stale status updates and preserve concurrent additions', async () => {
+  const { createRequestIndex } = require('../lib/request-index.cjs');
+  const store = memoryStore();
+  const first = createRequestIndex(store), second = createRequestIndex(store);
+  const rows = Array.from({ length: 10 }, (_, i) => ({ id: String(i), kind: 'trial', status: 'new', created_at: new Date(i).toISOString(), revision: 0 }));
+  await Promise.all(rows.map((row, i) => (i % 2 ? first : second).upsert(row)));
+  await first.upsert({ ...rows[0], status: 'read', revision: 2 });
+  await second.upsert({ ...rows[0], status: 'new', revision: 1 });
+  const saved = await store.get('request-index/v1');
+  assert.equal(saved.entries.length, 10);
+  assert.equal(saved.entries.find(row => row.id === '0').status, 'read');
+});
+
+test('Netlify saves USD notices without claiming payment receipt and filters them across instances', async () => {
+  const f = fixture(), next = fixture({ store: f.store });
+  const body = { kind: 'payment', requestToken: crypto.randomUUID(), name: 'Synthetic Parent', email: 'transfer@example.invalid', plan: 'Flexible', currency: 'USD', amount: '200', transferReference: 'TEST-TRANSFER', message: '', verification: 'Paid' };
+  const sent = await f.request('/api/requests', { method: 'POST', body });
+  assert.equal(sent.status, 201);
+  assert.equal((await next.request('/api/requests', { method: 'POST', body })).json.reference, sent.json.reference);
+  assert.equal((await next.request('/api/inbox/requests?kind=payment')).status, 401);
+  await next.request('/api/requests', { method: 'POST', body: material() });
+  const cookie = await next.login();
+  const list = await next.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.equal(list.json.total, 1);
+  assert.equal(list.json.requests[0].details.amount, '200.00');
+  assert.equal(list.json.requests[0].details.currency, 'USD');
+  assert.match(list.json.requests[0].details.verification, /^Unverified/);
+  const naira = await next.request('/api/requests', { method: 'POST', body: { ...body, requestToken: crypto.randomUUID(), currency: 'NGN', amount: '280000' } });
+  assert.equal(naira.status, 201);
+  const combined = await f.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.equal(combined.json.total, 2);
+  const opay = combined.json.requests.find(row => row.reference === naira.json.reference);
+  assert.equal(opay.details.amount, '280000.00');
+  assert.match(opay.details.verification, /OPay/);
+  for (const changed of [{ amount: '0' }, { amount: '1.001' }, { currency: 'GBP' }, { transferReference: '' }, { plan: 'Unknown' }]) {
+    assert.equal((await next.request('/api/requests', { method: 'POST', body: { ...body, ...changed, requestToken: crypto.randomUUID() } })).status, 422);
+  }
+});
+
 test('Netlify logout revokes a session after the API allowance is exhausted', async () => {
   const f = fixture(), cookie = await f.login();
   for (let i = 0; i < 149; i++) assert.equal((await f.request('/api/inbox/session', { cookie })).status, 200);
@@ -140,7 +390,7 @@ test('Netlify fails closed when password or storage is missing; never confirms a
 test('Netlify trial bookings and filtered pagination preserve the existing inbox contract', async () => {
   const f = fixture();
   await f.request('/api/requests', { method: 'POST', body: material() });
-  const trial = { kind: 'trial', requestToken: crypto.randomUUID(), email: 'trial@example.invalid', name: 'Test Parent', grade: 'Grade 8', curriculum: 'US: Common Core', plan: 'Growth', message: 'Algebra support' };
+  const trial = { kind: 'trial', requestToken: crypto.randomUUID(), email: 'trial@example.invalid', name: 'Test Parent', grade: 'Grade 8', curriculum: 'US: Common Core', timeZone: 'America/Toronto', availability: 'Tuesday 4 pm', plan: 'Growth', message: 'Algebra support' };
   assert.equal((await f.request('/api/requests', { method: 'POST', body: trial })).status, 201);
   const cookie = await f.login(), list = await f.request('/api/inbox/requests?kind=trial', { cookie });
   assert.equal(list.json.total, 1); assert.equal(list.json.unreadCount, 2); assert.equal(list.json.pageSize, 30);

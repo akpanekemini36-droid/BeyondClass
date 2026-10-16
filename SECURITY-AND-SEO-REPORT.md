@@ -56,10 +56,33 @@ The owner has chosen to defer the launch setup until after buying the custom dom
 
 ## Validation
 
-- Twenty-one automated checks cover the two inbox implementations, privacy, validation, duplicate prevention, concurrent rate limits, session expiry and password rotation, retired-deployment restrictions, video delivery, search metadata, safe build output and anonymous aggregate page counts.
+- Automated checks cover the two inbox implementations, privacy, validation, duplicate prevention, concurrent rate limits, session expiry and password rotation, retired-deployment restrictions, video delivery, search metadata, safe build output and anonymous aggregate page counts.
 - Browser checks loaded all ten public pages under the Content Security Policy and exercised the triangle, both forms, owner sign-in/sign-out, safe rendering of script-like text, and tablet/phone menus. No JavaScript or Content Security Policy errors were observed.
 - Dashboard and browser checks cover the day-range selector, chart, cookie/referrer-free count requests, query-string omission, privacy preferences, and the new text animation.
 - Netlify CLI 27.12.1 completed an offline production build, including API function bundling. Nothing was published by that check.
 - The production Netlify storage service and Google ownership verification still need the owner's live setup and checks described in the guide.
 
 References: [OWASP's Content Security Policy guidance](https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html), [Netlify Functions](https://docs.netlify.com/build/functions/overview/), [Netlify Blobs](https://docs.netlify.com/build/data-and-storage/netlify-blobs/), and [Google's sitemap instructions](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap).
+
+
+## Follow-up corrections: 16 October 2026
+
+Logout now has its own Netlify function route outside the main function's hosting-level rate limit. It retains origin, session and deployment-origin validation. Inbox reads use a private metadata index and load only the selected page's detailed request payloads; older request blobs are indexed on first use. Conditional writes and record revisions protect index updates from concurrent submissions and delayed status changes. A production-only scheduled function deletes expired sessions and rate-limit records every 15 minutes without deleting parent requests or active records.
+
+Booking forms now require curriculum, time zone and availability. Worksheet downloads are public and independent of form submission; the local server and safe build support the supplied PDF. Fragment redirects are limited to explicit own properties and also handle legitimate hash changes after initial load. Regression tests cover inherited fragments, hosting logout configuration, filtered page reads, legacy-index migration, concurrent index updates, expiry cleanup and booking validation.
+
+Official implementation references: [Netlify Functions configuration](https://docs.netlify.com/build/functions/api/), [Netlify Blobs](https://docs.netlify.com/build/data-and-storage/netlify-blobs/).
+
+## Inbox reliability and presentation follow-up
+
+Request writes now persist a unique repair marker before modifying the canonical record. If an index write fails or its acknowledgement is lost, the next inbox read retries reconciliation. The production cleanup function also reconciles all records every 15 minutes, recovering previously invisible records from older indexes. Target revisions keep a concurrent inbox read from removing a marker before its status write commits; conditional index updates cannot overwrite a newer revision. An unavailable repair produces a retry message rather than a misleading incomplete inbox or unread count.
+
+The inbox serializes automatic and manual status actions for each request, keeps refreshed cards locked while the operation is pending, and rejects responses from obsolete lists or sessions. Lost status responses trigger a fresh authoritative read. Regression checks simulate interrupted writes, failed index updates, older repairs, overlapping actions, refreshes and logout.
+
+Non-Netlify Node hosting supports an explicit `TRUSTED_PROXIES` list of IP addresses or CIDR ranges. It defaults to trusting none; forwarded addresses from other connections are ignored. Trusted chains are evaluated from the nearest hop, stopping at the first untrusted address. IPv4-mapped IPv6 addresses normalize to the same identity. Tests verify independent limits for distinct visitors and rejection of spoofed forwarded identities. Node password setup and login both enforce 12–256 characters. Netlify's separate password policy remains 16–256 characters.
+
+Worksheet request forms and their success messages now promise delivery within 48 hours, as confirmed by the owner. Comic Relief remains embedded in both regular and bold weights, independent of installed fonts; initial text display waits briefly for the embedded font rather than immediately showing a device font. All public page headers share the restored soft white/grey glow over their black background. Following the owner's confirmed direction, they also have a medium-width white streak falling from top-left to bottom-right, with soft fading edges and a slow 26-second drift. It stays behind the text, cannot intercept clicks, and stops moving when reduced motion is enabled.
+
+Proxy implementation references: [Node network address utilities](https://nodejs.org/api/net.html), [Express guidance on trusted proxy address chains](https://expressjs.com/en/guide/behind-proxies/).
+
+Validation of this follow-up: all 58 automated regression checks passed. Chrome checked all ten public page headers at 1440, 768 and 390 pixels, confirmed actual custom-font rendering, submitted a synthetic worksheet request, and exercised delayed status updates with a refresh and an attempted overlapping action. The Netlify production build bundled the API, logout and cleanup functions successfully; nothing was published.

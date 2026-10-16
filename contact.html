@@ -90,14 +90,30 @@
             </div>
             <div class="field">
               <label for="curriculum">Curriculum</label>
-              <select id="curriculum" name="curriculum">
+              <select id="curriculum" name="curriculum" required>
+                <option value="" selected disabled>Select your curriculum</option>
                 <option>UK: GCSE</option>
                 <option>UK: A Level</option>
                 <option>US: Common Core</option>
                 <option>US: SAT prep</option>
                 <option>Nigeria: WAEC / NECO</option>
+                <option>Canada: provincial curriculum</option>
+                <option>International: IB</option>
+                <option>Other curriculum</option>
                 <option>Not sure yet</option>
               </select>
+            </div>
+          </div>
+          <div class="two-col">
+            <div class="field">
+              <label for="bookingTimeZone">Your time zone</label>
+              <input id="bookingTimeZone" name="timeZone" list="bookingTimeZones" placeholder="e.g. America/Toronto" required maxlength="100" autocomplete="off" aria-describedby="timeZoneHelp">
+              <datalist id="bookingTimeZones"><option value="Africa/Lagos"><option value="America/Toronto"><option value="America/Vancouver"><option value="America/New_York"><option value="America/Chicago"><option value="America/Los_Angeles"><option value="Europe/London"><option value="UTC"></datalist>
+              <p id="timeZoneHelp" class="payment-note">Use a city or time zone, including daylight-saving details if relevant.</p>
+            </div>
+            <div class="field">
+              <label for="bookingAvailability">Preferred days and times</label>
+              <input id="bookingAvailability" name="availability" placeholder="e.g. Tue and Thu, 4–6 pm in my time zone" required maxlength="300" autocomplete="off">
             </div>
           </div>
           <div class="field">

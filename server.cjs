@@ -8,8 +8,15 @@ const { securityHeaders, inlineHashes } = require('./lib/security.cjs');
 const { validateRequest } = require('./lib/request-validation.cjs');
 const { allPages } = require('./lib/site-files.cjs');
 const analytics = require('./lib/analytics.cjs');
+const { createClientAddressResolver } = require('./lib/client-address.cjs');
+const MIN_PASSWORD = 12, MAX_PASSWORD = 256;
 
 function createApp(options = {}) {
+  const clientAddress = createClientAddressResolver(options.trustedProxies ?? process.env.TRUSTED_PROXIES ?? '');
+  const suppliedPassword = options.password || process.env.INBOX_PASSWORD;
+  if (suppliedPassword && (typeof suppliedPassword !== 'string' || suppliedPassword.length < MIN_PASSWORD || suppliedPassword.length > MAX_PASSWORD)) {
+    throw new Error('INBOX_PASSWORD must contain between 12 and 256 characters.');
+  }
   const root = __dirname;
   const dataDir = path.resolve(options.dataDir || process.env.DATA_DIR || path.join(root, '.data'));
   fs.mkdirSync(dataDir, { recursive: true });
@@ -17,9 +24,7 @@ function createApp(options = {}) {
   const passwordFile = path.join(dataDir, 'inbox-password.txt');
   const hashPassword = (password, salt) => crypto.scryptSync(password, salt, 64).toString('hex');
   let credentials;
-  const suppliedPassword = options.password || process.env.INBOX_PASSWORD;
   if (suppliedPassword) {
-    if (suppliedPassword.length < 12) throw new Error('INBOX_PASSWORD must contain at least 12 characters.');
     const salt = crypto.randomBytes(16).toString('hex');
     credentials = { salt, hash: hashPassword(suppliedPassword, salt) };
   } else if (fs.existsSync(authFile)) {
@@ -32,7 +37,7 @@ function createApp(options = {}) {
     fs.writeFileSync(passwordFile, password + '\n', { mode: 0o600, flag: 'wx' });
   }
   const verifyPassword = password => {
-    if (typeof password !== 'string' || password.length > 256) return false;
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) return false;
     const hash = Buffer.from(hashPassword(password, credentials.salt), 'hex');
     const expected = Buffer.from(credentials.hash, 'hex');
     return hash.length === expected.length && crypto.timingSafeEqual(hash, expected);
@@ -45,6 +50,10 @@ function createApp(options = {}) {
       created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'new',
       details TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS requests_created ON requests(created_at DESC);
+    CREATE INDEX IF NOT EXISTS requests_kind_created ON requests(kind, created_at DESC);
+    CREATE INDEX IF NOT EXISTS requests_status_created ON requests(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS requests_kind_status_created ON requests(kind, status, created_at DESC);
     CREATE TABLE IF NOT EXISTS pageviews (
       day TEXT NOT NULL, page TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (day, page)
@@ -54,14 +63,14 @@ function createApp(options = {}) {
   const sessions = new Map();
   const rates = new Map();
   const pages = new Set([...allPages, 'sitemap.xml', 'robots.txt']);
-  const mime = { '.html':'text/html; charset=utf-8', '.xml':'application/xml; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.svg':'image/svg+xml', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.png':'image/png', '.mp4':'video/mp4' };
+  const mime = { '.html':'text/html; charset=utf-8', '.xml':'application/xml; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.svg':'image/svg+xml', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.png':'image/png', '.mp4':'video/mp4', '.pdf':'application/pdf' };
   const fail = (status, message) => Object.assign(new Error(message), { status });
   const json = (res, status, value) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(value));
   };
   function limit(req, key, max, res) {
-    const now = Date.now(), id = key + ':' + req.socket.remoteAddress;
+    const now = Date.now(), id = key + ':' + clientAddress(req);
     let bucket = rates.get(id);
     if (!bucket || bucket.until <= now) { bucket = { count: 0, until: now + 15 * 60 * 1000 }; rates.set(id, bucket); }
     if (++bucket.count > max) {
@@ -157,7 +166,7 @@ function createApp(options = {}) {
       const body = await readJson(req);
       if (suppliedPassword) throw fail(409, 'This password is managed by your server settings.');
       if (!verifyPassword(body.currentPassword)) throw fail(401, 'Your current password is not correct.');
-      if (typeof body.newPassword !== 'string' || body.newPassword.length < 12 || body.newPassword.length > 256) throw fail(422, 'Use a password with 12 to 256 characters.');
+      if (typeof body.newPassword !== 'string' || body.newPassword.length < MIN_PASSWORD || body.newPassword.length > MAX_PASSWORD) throw fail(422, 'Use a password with 12 to 256 characters.');
       const salt = crypto.randomBytes(16).toString('hex');
       const nextCredentials = { salt, hash: hashPassword(body.newPassword, salt) };
       fs.writeFileSync(authFile + '.tmp', JSON.stringify(nextCredentials), { mode: 0o600 });
@@ -169,10 +178,12 @@ function createApp(options = {}) {
     }
     if (url.pathname === '/api/inbox/requests' && req.method === 'GET') {
       const page = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get('page'), 10) || 1));
-      const kind = ['materials', 'trial'].includes(url.searchParams.get('kind')) ? url.searchParams.get('kind') : '';
+      const kind = ['materials', 'trial', 'payment'].includes(url.searchParams.get('kind')) ? url.searchParams.get('kind') : '';
       const unread = url.searchParams.get('unread') === '1';
-      const where = ' WHERE (? = \'\' OR kind = ?) AND (? = 0 OR status = \'new\')';
-      const args = [kind, kind, unread ? 1 : 0];
+      const clauses = [], args = [];
+      if (kind) { clauses.push('kind = ?'); args.push(kind); }
+      if (unread) clauses.push("status = 'new'");
+      const where = clauses.length ? ' WHERE ' + clauses.join(' AND ') : '';
       const total = db.prepare('SELECT COUNT(*) AS total FROM requests' + where).get(...args).total;
       const unreadCount = db.prepare("SELECT COUNT(*) AS total FROM requests WHERE status = 'new'").get().total;
       const rows = db.prepare('SELECT id, reference, kind, created_at, status, details FROM requests' + where + ' ORDER BY created_at DESC, rowid DESC LIMIT 30 OFFSET ?').all(...args, (page - 1) * 30);

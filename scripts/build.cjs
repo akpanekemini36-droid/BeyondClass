@@ -24,7 +24,7 @@ function copyAssets(source, destination) {
     if (entry.isSymbolicLink() || entry.name.startsWith('.')) throw new Error('Unexpected asset: ' + entry.name);
     const from = path.join(source, entry.name), to = path.join(destination, entry.name);
     if (entry.isDirectory()) copyAssets(from, to);
-    else if (/\.(?:css|js|svg|png|jpe?g|mp4|webp|woff2?)$/i.test(entry.name)) fs.copyFileSync(from, to);
+    else if (/\.(?:css|js|svg|png|jpe?g|mp4|pdf|webp|woff2?)$/i.test(entry.name)) fs.copyFileSync(from, to);
     else throw new Error('Unexpected public asset type: ' + entry.name);
   }
 }

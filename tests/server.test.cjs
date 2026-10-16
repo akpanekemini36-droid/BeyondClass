@@ -8,11 +8,11 @@ const crypto = require('node:crypto');
 const { createApp } = require('../server.cjs');
 const TEST_PASSWORD = 'test-only-inbox-password';
 
-async function fixture(t, generatedPassword = false) {
+async function fixture(t, generatedPassword = false, appOptions = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'beyondclass-inbox-test-'));
   let app, base;
   async function start() {
-    app = createApp({dataDir,...(generatedPassword ? {} : {password: TEST_PASSWORD})});
+    app = createApp({dataDir,...appOptions,...(generatedPassword ? {} : {password: TEST_PASSWORD})});
     await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
     base = 'http://127.0.0.1:' + app.server.address().port;
   }
@@ -45,7 +45,85 @@ async function fixture(t, generatedPassword = false) {
   };
 }
 const material = overrides => ({kind:'materials',requestToken:crypto.randomUUID(),email:'parent@example.invalid',grade:'Year 7',topic:'Fractions',...overrides});
-const trial = () => ({kind:'trial',requestToken:crypto.randomUUID(),email:'trial@example.invalid',name:'Test Parent',grade:'Grade 8',curriculum:'US: Common Core',plan:'Growth',message:'Help with algebra.'});
+const trial = () => ({kind:'trial',requestToken:crypto.randomUUID(),email:'trial@example.invalid',name:'Test Parent',grade:'Grade 8',curriculum:'US: Common Core',timeZone:'America/Toronto',availability:'Tuesday 4 pm',plan:'Growth',message:'Help with algebra.'});
+
+test('trusted proxy clients have independent limits; spoofed leftmost addresses cannot reset them', async t => {
+  const f = await fixture(t, false, { trustedProxies: ['127.0.0.1/32'] });
+  for (let i = 1; i <= 21; i++) {
+    assert.equal((await f.request('/api/requests', { method: 'POST', body: material(), headers: { 'X-Forwarded-For': '203.0.113.' + i } })).status, 201);
+  }
+  for (let i = 0; i < 19; i++) {
+    assert.equal((await f.request('/api/requests', { method: 'POST', body: material(), headers: { 'X-Forwarded-For': '198.51.100.' + i + ', 203.0.113.1' } })).status, 201);
+  }
+  assert.equal((await f.request('/api/requests', { method: 'POST', body: material(), headers: { 'X-Forwarded-For': '192.0.2.99, 203.0.113.1' } })).status, 429);
+});
+
+test('forwarded headers from an untrusted connection cannot bypass rate limits', async t => {
+  const f = await fixture(t, false, { trustedProxies: '' });
+  for (let i = 0; i < 20; i++) assert.equal((await f.request('/api/requests', { method: 'POST', body: material(), headers: { 'X-Forwarded-For': '203.0.113.' + i } })).status, 201);
+  assert.equal((await f.request('/api/requests', { method: 'POST', body: material(), headers: { 'X-Forwarded-For': '198.51.100.99' } })).status, 429);
+});
+
+test('Node password setup and login enforce the same length boundaries', async t => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'beyondclass-password-boundary-'));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  for (const length of [11, 257]) assert.throws(() => createApp({ dataDir, password: 'x'.repeat(length) }), /between 12 and 256/);
+  for (const length of [12, 256]) {
+    const password = 'x'.repeat(length), app = createApp({ dataDir, password });
+    await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+    const origin = 'http://127.0.0.1:' + app.server.address().port;
+    try {
+      const login = await fetch(origin + '/api/inbox/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ password }) });
+      assert.equal(login.status, 200);
+      await login.text();
+    } finally { await new Promise(resolve => app.server.close(resolve)); }
+  }
+});
+
+test('bookings require an explicit curriculum and save time zone and availability; sample PDF needs no form', async t => {
+  const f = await fixture(t);
+  for (const changed of [{ curriculum: '' }, { timeZone: '' }, { availability: '' }]) {
+    assert.equal((await f.request('/api/requests', { method: 'POST', body: { ...trial(), ...changed } })).status, 422);
+  }
+  assert.equal((await f.request('/api/requests', { method: 'POST', body: { ...trial(), curriculum: 'Canada: provincial curriculum' } })).status, 201);
+  const cookie = await f.login();
+  const saved = (await f.request('/api/inbox/requests?kind=trial', { cookie })).json.requests[0];
+  assert.equal(saved.details.timeZone, 'America/Toronto');
+  assert.equal(saved.details.availability, 'Tuesday 4 pm');
+  const pdf = await f.request('/assets/materials/grade9-probability-homework.pdf', { method: 'HEAD' });
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.headers.get('content-type'), 'application/pdf');
+});
+
+test('USD transfer notices remain unverified, private, retry-safe and separately filterable', async t => {
+  const f = await fixture(t);
+  const body = { kind: 'payment', requestToken: crypto.randomUUID(), name: 'Synthetic Parent', email: 'transfer@example.invalid', plan: 'Confidence Week', currency: 'USD', amount: '19.99', transferReference: 'TEST-TRANSFER', message: 'Test only', verification: 'Paid' };
+  const sent = await f.request('/api/requests', { method: 'POST', body });
+  assert.equal(sent.status, 201);
+  assert.equal((await f.request('/api/requests', { method: 'POST', body })).json.reference, sent.json.reference);
+  assert.equal((await f.request('/api/inbox/requests?kind=payment')).status, 401);
+  await f.request('/api/requests', { method: 'POST', body: trial() });
+  const cookie = await f.login();
+  const list = await f.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.equal(list.json.total, 1);
+  const saved = list.json.requests[0];
+  assert.equal(saved.details.amount, '19.99');
+  assert.equal(saved.details.currency, 'USD');
+  assert.match(saved.details.verification, /^Unverified/);
+  await f.request('/api/inbox/requests/' + saved.id, { method: 'PATCH', cookie, body: { status: 'read' } });
+  const read = await f.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.match(read.json.requests[0].details.verification, /^Unverified/);
+  const naira = await f.request('/api/requests', { method: 'POST', body: { ...body, requestToken: crypto.randomUUID(), plan: 'Flexible', currency: 'NGN', amount: '280000' } });
+  assert.equal(naira.status, 201);
+  const combined = await f.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.equal(combined.json.total, 2);
+  const opay = combined.json.requests.find(row => row.reference === naira.json.reference);
+  assert.equal(opay.details.amount, '280000.00');
+  assert.match(opay.details.verification, /OPay/);
+  for (const changed of [{ amount: '0' }, { amount: '-1' }, { amount: '1.234' }, { amount: 'NaN' }, { amount: '100000' }, { currency: 'GBP' }, { plan: 'Unknown' }, { transferReference: '' }]) {
+    assert.equal((await f.request('/api/requests', { method: 'POST', body: { ...body, ...changed, requestToken: crypto.randomUUID() } })).status, 422);
+  }
+});
 
 test('logout still revokes the local session after the API allowance is exhausted', async t => {
   const f = await fixture(t), cookie = await f.login();

@@ -20,5 +20,6 @@ export default async function (request, context) {
 
 export const config = {
   path: '/api/*',
+  excludedPath: '/api/inbox/logout',
   rateLimit: { action: 'rate_limit', aggregateBy: ['ip'], windowSize: 60, windowLimit: 120 }
 };

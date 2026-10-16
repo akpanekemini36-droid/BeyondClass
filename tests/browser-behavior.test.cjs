@@ -53,9 +53,82 @@ function inboxFixture() {
 }
 const requestList = { requests: [{ id: 'test', kind: 'trial', status: 'new', reference: 'TEST', created_at: '2026-10-15T10:00:00Z', details: { name: 'Synthetic parent', email: 'review@example.invalid' } }], total: 1, unreadCount: 1, page: 1, pageSize: 30 };
 
+async function shownInbox() {
+  const f = inboxFixture();
+  f.take('/session').resolve(response({})); await flush();
+  const data = structuredClone(requestList);
+  data.requests[0].status = 'new'; data.unreadCount = 1;
+  f.take('/requests?').resolve(response(data)); await flush();
+  return f;
+}
+
+test('automatic read and manual status actions cannot overlap, and counts change only once', async () => {
+  const f = await shownInbox(), card = f.get('requestList').children[0], button = card.children.at(-1);
+  card.open = true;
+  const automatic = card.listeners.toggle();
+  const patch = f.take('/requests/test');
+  assert.equal(button.disabled, true);
+  await button.listeners.click();
+  assert.equal(f.requests.filter(item => item.options?.method === 'PATCH').length, 0);
+  patch.resolve(response({ status: 'read', revision: 1 })); await automatic;
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, 'Mark as new');
+  assert.match(f.get('inboxCount').textContent, /0 new/);
+  const manual = button.listeners.click();
+  const next = f.take('/requests/test');
+  assert.equal(JSON.parse(next.options.body).status, 'new');
+  next.resolve(response({ status: 'new', revision: 2 })); await manual;
+  assert.equal(button.textContent, 'Mark as read');
+  assert.match(f.get('inboxCount').textContent, /1 new/);
+});
+
+test('a refreshed card stays locked until its existing status operation settles', async () => {
+  const f = await shownInbox(), oldCard = f.get('requestList').children[0];
+  oldCard.open = true;
+  const automatic = oldCard.listeners.toggle();
+  const patch = f.take('/requests/test');
+  const refresh = f.get('refreshInbox').listeners.click();
+  f.take('/requests?').resolve(response(structuredClone(requestList))); await refresh;
+  const refreshed = f.get('requestList').children[0], button = refreshed.children.at(-1);
+  assert.equal(button.disabled, true);
+  await button.listeners.click();
+  assert.equal(f.requests.filter(item => item.options?.method === 'PATCH').length, 0);
+  patch.resolve(response({ status: 'read', revision: 1 })); await automatic;
+  const latest = structuredClone(requestList); latest.requests[0].status = 'read'; latest.unreadCount = 0;
+  f.take('/requests?').resolve(response(latest)); await flush();
+  assert.equal(f.get('requestList').children[0].children.at(-1).disabled, false);
+  assert.match(f.get('inboxCount').textContent, /0 new/);
+});
+
+test('a status response from before logout cannot change the next session or its counts', async () => {
+  const f = await shownInbox(), card = f.get('requestList').children[0];
+  card.open = true;
+  const pending = card.listeners.toggle(), oldPatch = f.take('/requests/test');
+  const logout = f.get('logoutInbox').listeners.click();
+  f.take('/logout').resolve(response({})); await logout;
+  const form = f.get('inboxLoginForm');
+  const login = form.listeners.submit.call(form, { preventDefault() {} });
+  f.take('/login').resolve(response({})); await flush();
+  f.take('/requests?').resolve(response(structuredClone(requestList))); await login;
+  oldPatch.resolve(response({ status: 'read', revision: 1 })); await pending;
+  assert.match(f.get('inboxCount').textContent, /1 new/);
+  assert.equal(f.get('requestList').children[0].children.at(-1).textContent, 'Mark as read');
+});
+
+test('an uncertain failed status response refreshes authoritative inbox counts', async () => {
+  const f = await shownInbox(), card = f.get('requestList').children[0];
+  card.open = true;
+  const pending = card.listeners.toggle();
+  f.take('/requests/test').resolve(response({ error: 'Could not confirm status' }, 503)); await pending;
+  const latest = structuredClone(requestList); latest.requests[0].status = 'read'; latest.unreadCount = 0;
+  f.take('/requests?').resolve(response(latest)); await flush();
+  assert.match(f.get('inboxCount').textContent, /0 new/);
+  assert.equal(f.get('requestList').children[0].children.at(-1).textContent, 'Mark as new');
+});
+
 test('sensitive forms fail safely before JavaScript initializes', () => {
   let count = 0;
-  for (const file of ['index.html', 'resources.html', 'contact.html', 'inbox.html']) {
+  for (const file of ['index.html', 'resources.html', 'contact.html', 'inbox.html', 'payment.html']) {
     for (const match of source(file).matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/g)) {
       count++;
       assert.match(match[1], /\bmethod="post"/i, file + ' must never default to GET');
@@ -64,7 +137,7 @@ test('sensitive forms fail safely before JavaScript initializes', () => {
       assert.match(button[0], /\bdisabled\b/, file + ' must block submission before its handler exists');
     }
   }
-  assert.equal(count, 5);
+  assert.equal(count, 7);
   const fixture = inboxFixture();
   for (const id of ['inboxLoginForm', 'changeInboxPassword']) {
     assert.equal(typeof fixture.get(id).listeners.submit, 'function');
@@ -117,8 +190,9 @@ test('pagehide invalidates both pending list and pending session checks', async 
   }
 });
 
-function siteFixture(protocol = 'file:') {
-  const nodes = new Map(), requests = [];
+function siteFixture(protocol = 'file:', hash = '') {
+  const nodes = new Map(), requests = [], events = {}, redirects = [];
+  const location = { protocol, hash, search: '', pathname: '/', replace(url) { redirects.push(url); } };
   for (const id of ['triCanvas', 'triShape', 'triRandomize', 'bookingForm', 'formStatus', 'freeResourceForm', 'frStatus']) nodes.set(id, element());
   const handles = ['A', 'B', 'C'].map(key => {
     for (const prefix of ['triPoint', 'triText', 'triEq']) nodes.set(prefix + key, element());
@@ -132,7 +206,7 @@ function siteFixture(protocol = 'file:') {
   for (const id of ['bookingForm', 'freeResourceForm']) {
     nodes.get(id).button = element(); nodes.get(id).button.disabled = true;
   }
-  const formFields = { bookingForm: ['parentName', 'email', 'studentGrade', 'curriculum', 'planInterest', 'message'], freeResourceForm: ['frEmail', 'frGrade', 'frTopic'] };
+  const formFields = { bookingForm: ['parentName', 'email', 'studentGrade', 'curriculum', 'bookingTimeZone', 'bookingAvailability', 'planInterest', 'message'], freeResourceForm: ['frEmail', 'frGrade', 'frTopic'] };
   for (const [formId, fields] of Object.entries(formFields)) {
     fields.forEach(id => { nodes.set(id, element()); nodes.get(id).value = 'Test ' + id; });
     nodes.get(formId).reset = () => fields.forEach(id => { nodes.get(id).value = ''; });
@@ -140,11 +214,11 @@ function siteFixture(protocol = 'file:') {
   nodes.get('planInterest').options = [];
   vm.runInNewContext(source('assets/site.js'), {
     document: { documentElement: element(), visibilityState: 'hidden', addEventListener() {}, getElementById: id => nodes.get(id) || null, querySelector: () => null, querySelectorAll: () => [] },
-    window: { location: { protocol, hash: '', search: '', pathname: '/' }, crypto: crypto.webcrypto, matchMedia: () => ({ matches: false, addEventListener() {} }) },
+    window: { location, addEventListener(name, callback) { events[name] = callback; }, crypto: crypto.webcrypto, matchMedia: () => ({ matches: false, addEventListener() {} }) },
     navigator: { doNotTrack: '1' }, URLSearchParams, Uint8Array, AbortController, setTimeout, clearTimeout,
     fetch(url, options) { return new Promise(resolve => requests.push({ url, options, resolve })); }
   });
-  return { nodes, handles, requests };
+  return { nodes, handles, requests, events, redirects, location };
 }
 
 test('public form buttons enable only after their submit handlers are attached', () => {
@@ -153,6 +227,28 @@ test('public form buttons enable only after their submit handlers are attached',
     assert.equal(typeof nodes.get(id).listeners.submit, 'function');
     assert.equal(nodes.get(id).button.disabled, false);
   }
+});
+
+test('inherited or unexpected URL fragments cannot interrupt form initialization', () => {
+  for (const hash of ['#__proto__', '#constructor', '#toString', '#unknown', '#%E0%A4%A']) {
+    const { nodes } = siteFixture('https:', hash);
+    for (const id of ['bookingForm', 'freeResourceForm']) {
+      assert.equal(typeof nodes.get(id).listeners.submit, 'function', hash);
+      assert.equal(nodes.get(id).button.disabled, false, hash);
+    }
+  }
+});
+
+test('allowlisted section fragments redirect on arrival and on later hash changes', () => {
+  assert.deepEqual(siteFixture('https:', '#pricing').redirects, ['pricing.html#pricing']);
+  const f = siteFixture('https:');
+  f.location.hash = '#contact';
+  f.events.hashchange();
+  assert.deepEqual(f.redirects, ['contact.html#contact']);
+  f.location.hash = '#__proto__';
+  f.events.hashchange();
+  assert.equal(f.redirects.length, 1);
+  assert.equal(f.nodes.get('bookingForm').button.disabled, false);
 });
 
 test('triangle keyboard and pointer movements reject flat shapes but allow valid movement', () => {

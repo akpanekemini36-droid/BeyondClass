@@ -18,8 +18,9 @@
     var filtered = document.getElementById('inboxKind').value || document.getElementById('inboxUnread').checked;
     document.getElementById('inboxCount').textContent = totalCount + (filtered ? ' matching request' : ' request') + (totalCount === 1 ? '' : 's') + ' · ' + unreadCount + (filtered ? ' new overall' : ' new');
   }
-  var analyticsVersion = 0, sessionVersion = 0, listVersion = 0;
-  function signedOut() { sessionVersion++; analyticsVersion++; loading = false; login.hidden = false; content.hidden = true; list.replaceChildren(); document.getElementById('analyticsSummary').hidden = true; document.getElementById('analyticsChart').replaceChildren(); document.getElementById('analyticsPageRows').replaceChildren(); }
+  var analyticsVersion = 0, sessionVersion = 0, listVersion = 0, statusVersion = 0;
+  var activeStatusUpdates = new Map();
+  function signedOut() { sessionVersion++; analyticsVersion++; statusVersion++; activeStatusUpdates.clear(); loading = false; login.hidden = false; content.hidden = true; list.replaceChildren(); document.getElementById('analyticsSummary').hidden = true; document.getElementById('analyticsChart').replaceChildren(); document.getElementById('analyticsPageRows').replaceChildren(); }
   async function api(path, method, body) {
     var version = sessionVersion;
     var options = { credentials: 'same-origin', cache: 'no-store' };
@@ -70,13 +71,13 @@
     var renderedVersion = listVersion, renderedSession = sessionVersion;
     var card = node('details', undefined, 'inbox-request');
     var summary = node('summary');
-    var title = request.kind === 'materials' ? 'Free materials: ' + request.details.topic : 'Trial booking: ' + request.details.name;
+    var title = request.kind === 'payment' ? request.details.currency + ' transfer notice: ' + request.details.name : request.kind === 'materials' ? 'Free materials: ' + request.details.topic : 'Trial booking: ' + request.details.name;
     summary.append(node('strong', title), node('span', request.status === 'new' ? 'New' : 'Read', 'inbox-badge'));
     var date = new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos' }).format(new Date(request.created_at));
     summary.append(node('span', request.reference + ' · ' + date, 'inbox-request-meta'));
     card.append(summary);
     var fields = node('dl');
-    var labels = { name: 'Parent', email: 'Email', grade: 'Grade / year', topic: 'Topic', curriculum: 'Curriculum', plan: 'Plan', message: 'Notes' };
+    var labels = { name: 'Parent', email: 'Email', grade: 'Grade / year', topic: 'Topic', curriculum: 'Curriculum', timeZone: 'Time zone', availability: 'Preferred availability', plan: 'Plan', currency: 'Currency', amount: 'Reported amount', transferReference: 'Transfer reference / sender name', verification: 'Payment verification', message: 'Notes' };
     Object.keys(labels).forEach(function (key) {
       if (!request.details[key]) return;
       fields.append(node('dt', labels[key]), node('dd', request.details[key]));
@@ -84,49 +85,72 @@
     card.append(fields);
     var readButton = node('button', request.status === 'new' ? 'Mark as read' : 'Mark as new', 'btn-secondary');
     readButton.type = 'button';
+    readButton.disabled = activeStatusUpdates.has(request.id);
     async function setRead(nextStatus) {
-      await api('/api/inbox/requests/' + request.id, 'PATCH', { status: nextStatus });
-      if (renderedSession !== sessionVersion) return;
-      if (renderedVersion !== listVersion) { load(); return; }
-      if (request.status !== nextStatus) {
-        var change = nextStatus === 'new' ? 1 : -1;
-        unreadCount += change;
-        if (document.getElementById('inboxUnread').checked) {
-          totalCount += change;
-          unreadChanged = true;
-          updatePagination();
+      if (renderedSession !== sessionVersion || activeStatusUpdates.has(request.id)) return;
+      var operation = ++statusVersion, refreshAfter = false;
+      activeStatusUpdates.set(request.id, operation);
+      readButton.disabled = true;
+      card.setAttribute('aria-busy', 'true');
+      function isCurrent() { return renderedSession === sessionVersion && activeStatusUpdates.get(request.id) === operation; }
+      try {
+        var result = await api('/api/inbox/requests/' + request.id, 'PATCH', { status: nextStatus });
+        if (!isCurrent()) return;
+        if (renderedVersion !== listVersion) { refreshAfter = true; return; }
+        if (typeof result.revision === 'number' && result.revision < (request.revision || 0)) { refreshAfter = true; return; }
+        var savedStatus = result.status === 'new' || result.status === 'read' ? result.status : nextStatus;
+        if (request.status !== savedStatus) {
+          var change = savedStatus === 'new' ? 1 : -1;
+          unreadCount += change;
+          if (document.getElementById('inboxUnread').checked) {
+            totalCount += change;
+            unreadChanged = true;
+            updatePagination();
+          }
+        }
+        request.status = savedStatus;
+        if (typeof result.revision === 'number') request.revision = result.revision;
+        updateCount();
+        summary.querySelector('.inbox-badge').textContent = savedStatus === 'new' ? 'New' : 'Read';
+        readButton.textContent = savedStatus === 'new' ? 'Mark as read' : 'Mark as new';
+      } catch (error) {
+        if (!isCurrent()) return;
+        status.textContent = error.message;
+        // A lost response can follow a committed change. Reload authoritative state.
+        refreshAfter = true;
+      } finally {
+        if (isCurrent()) {
+          activeStatusUpdates.delete(request.id);
+          statusVersion++;
+          readButton.disabled = false;
+          card.removeAttribute('aria-busy');
+          if (refreshAfter || renderedVersion !== listVersion || (!card.open && unreadChanged)) load();
         }
       }
-      request.status = nextStatus;
-      updateCount();
-      summary.querySelector('.inbox-badge').textContent = nextStatus === 'new' ? 'New' : 'Read';
-      readButton.textContent = nextStatus === 'new' ? 'Mark as read' : 'Mark as new';
     }
     card.addEventListener('toggle', async function () {
       if (card.open && request.status === 'new') {
-        try { await setRead('read'); } catch (error) { status.textContent = error.message; }
+        await setRead('read');
       }
       // Keep the open request readable; refresh the shrinking unread list
       // when it is closed, or through the remaining-requests button.
       if (!card.open && unreadChanged && renderedVersion === listVersion && renderedSession === sessionVersion) load();
     });
     readButton.addEventListener('click', async function () {
-      readButton.disabled = true;
-      try { await setRead(request.status === 'new' ? 'read' : 'new'); }
-      catch (error) { status.textContent = error.message; }
-      finally { readButton.disabled = false; }
+      await setRead(request.status === 'new' ? 'read' : 'new');
     });
     card.append(readButton);
     return card;
   }
   async function load() {
-    var version = sessionVersion, currentList = ++listVersion;
+    var version = sessionVersion, currentList = ++listVersion, currentStatus = statusVersion;
     loading = true; status.textContent = 'Loading requests…';
     list.replaceChildren();
     try {
       var params = new URLSearchParams({ page: String(page), kind: document.getElementById('inboxKind').value, unread: document.getElementById('inboxUnread').checked ? '1' : '0' });
       var result = await api('/api/inbox/requests?' + params);
       if (version !== sessionVersion || currentList !== listVersion) return;
+      if (currentStatus !== statusVersion) return load();
       var pages = Math.max(1, Math.ceil(result.total / result.pageSize));
       if (page > pages) { page = pages; return load(); }
       login.hidden = true; content.hidden = false;

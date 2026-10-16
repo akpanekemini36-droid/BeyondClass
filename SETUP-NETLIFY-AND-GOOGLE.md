@@ -51,6 +51,8 @@ The build uses `SITE_URL` to generate your final sitemap, robots file, canonical
 
 If your Stripe Payment Links are ready, add the public `https://buy.stripe.com/...` links to their matching plans in `assets/checkout-config.js` before publishing. Otherwise, checkout can be connected later. Keep secret keys out of website files.
 
+The Payment page already includes the Cleva USD and OPay NGN receiving details you supplied. After publishing, check both currency selections and send a test transfer notice to confirm it appears in your private inbox. A notice does not move money or confirm a payment: check the receiving account yourself before telling a parent their payment has arrived.
+
 ## 4. Publish the updated website
 
 1. Extract the latest **BeyondClass-Netlify-Source.zip** into a folder on your PC.

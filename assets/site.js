@@ -36,6 +36,44 @@
     hint.className = 'row-hint';
     hint.textContent = 'Swipe to explore →';
     row.parentNode.insertBefore(hint, row);
+    if (!row.id) row.id = 'browseRow' + index;
+    var controls = document.createElement('div');
+    controls.className = 'row-controls';
+    var previous = document.createElement('button');
+    var next = document.createElement('button');
+    var position = document.createElement('span');
+    previous.type = next.type = 'button';
+    previous.textContent = '← Previous';
+    next.textContent = 'Next →';
+    previous.setAttribute('aria-label', 'Previous: ' + group[1]);
+    next.setAttribute('aria-label', 'Next: ' + group[1]);
+    previous.setAttribute('aria-controls', row.id);
+    next.setAttribute('aria-controls', row.id);
+    position.setAttribute('aria-live', 'polite');
+    controls.append(previous, position, next);
+    row.parentNode.insertBefore(controls, row);
+    function activeCard() {
+      var left = row.getBoundingClientRect().left + 8;
+      var cards = Array.from(row.children);
+      return cards.reduce(function (nearest, card, cardIndex) {
+        return Math.abs(card.getBoundingClientRect().left - left) < Math.abs(cards[nearest].getBoundingClientRect().left - left) ? cardIndex : nearest;
+      }, 0);
+    }
+    function updateControls() {
+      var active = activeCard();
+      position.textContent = (active + 1) + ' of ' + row.children.length;
+      previous.disabled = row.scrollLeft <= 2;
+      next.disabled = row.scrollLeft >= row.scrollWidth - row.clientWidth - 2;
+    }
+    function moveCard(direction) {
+      var cards = Array.from(row.children);
+      var target = cards[Math.max(0, Math.min(cards.length - 1, activeCard() + direction))];
+      row.scrollTo({ left: row.scrollLeft + target.getBoundingClientRect().left - row.getBoundingClientRect().left - 8, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+    previous.addEventListener('click', function () { moveCard(-1); });
+    next.addEventListener('click', function () { moveCard(1); });
+    row.addEventListener('scroll', updateControls, { passive: true });
+    window.addEventListener('resize', updateControls);
     var syncRowAccess = function () {
       if (compactRows.matches) {
         row.setAttribute('tabindex', '0');
@@ -44,16 +82,22 @@
         row.removeAttribute('tabindex');
         row.removeAttribute('aria-describedby');
       }
+      updateControls();
     };
     syncRowAccess();
     compactRows.addEventListener('change', syncRowAccess);
   });
   var legacySections = { vetting: 'tutors.html', rigor: 'tutors.html', pricing: 'pricing.html', 'confidence-week': 'pricing.html', trust: 'reviews.html', faq: 'faq.html', 'child-protection': 'privacy.html', 'from-founder': 'about.html', 'free-resource': 'resources.html', contact: 'contact.html' };
-  var incomingSection = window.location.hash.slice(1);
-  if (!document.getElementById(incomingSection) && legacySections[incomingSection]) {
-    window.location.replace(legacySections[incomingSection] + window.location.hash);
-    return;
+  function redirectLegacySection() {
+    var incomingSection = window.location.hash.slice(1);
+    if (!document.getElementById(incomingSection) && Object.prototype.hasOwnProperty.call(legacySections, incomingSection)) {
+      window.location.replace(legacySections[incomingSection] + window.location.hash);
+      return true;
+    }
+    return false;
   }
+  window.addEventListener('hashchange', redirectLegacySection);
+  if (redirectLegacySection()) return;
 
   /* ------------------------------------------------------------------
      CONTACT DETAILS — the only place you need to edit these.
@@ -559,8 +603,10 @@
         if (!editedWhileSending) form.reset();
         delete form.dataset.requestToken;
         delete form.dataset.requestPayload;
-        statusEl.textContent = (payload.kind === 'materials'
-          ? 'Your materials request has been received. We’ll email your learning materials to ' + payload.email + '.'
+        statusEl.textContent = (payload.kind === 'payment'
+          ? 'Your ' + payload.currency + ' transfer notice for ' + payload.plan + ' has been saved. We’ll verify the money arrived and email you at ' + payload.email + '. This is not a payment confirmation.'
+          : payload.kind === 'materials'
+          ? 'Your materials request has been received. We’ll email your learning materials to ' + payload.email + ' within 48 hours.'
           : 'Your trial request has been received. We’ll contact you at ' + payload.email + ' to arrange a lesson.') + ' Reference: ' + result.reference;
         if (editedWhileSending) statusEl.textContent += ' Your later edits are still in the form and have not been sent.';
       } catch (error) {
@@ -588,13 +634,21 @@
     return {
       kind: 'trial', name: valueOf('parentName'), email: valueOf('email'),
       grade: valueOf('studentGrade'), curriculum: valueOf('curriculum'),
-      plan: valueOf('planInterest'), message: valueOf('message')
+      plan: valueOf('planInterest'), message: valueOf('message'),
+      timeZone: valueOf('bookingTimeZone'), availability: valueOf('bookingAvailability')
     };
   });
 
   wireRequestForm('freeResourceForm', 'frStatus', function () {
     return {
       kind: 'materials', email: valueOf('frEmail'), grade: valueOf('frGrade'), topic: valueOf('frTopic')
+    };
+  });
+  wireRequestForm('transferNoticeForm', 'transferNoticeStatus', function () {
+    return {
+      kind: 'payment', name: valueOf('transferParentName'), email: valueOf('transferEmail'),
+      plan: valueOf('checkoutPlan'), currency: valueOf('checkoutCurrency'), amount: valueOf('transferAmount'),
+      transferReference: valueOf('transferReference'), message: valueOf('transferMessage')
     };
   });
 })();
