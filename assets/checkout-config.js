@@ -18,6 +18,7 @@ window.BEYONDCLASS_CHECKOUT = {
     Growth: { USD: '', NGN: '' },
     Premium: { USD: '', NGN: '' },
     Flexible: { USD: '', NGN: '' },
+    Ultra: { USD: '', NGN: '' },
     'Confidence Week': { USD: '', NGN: '' }
   }
 };

@@ -125,6 +125,27 @@ test('USD transfer notices remain unverified, private, retry-safe and separately
   }
 });
 
+test('Ultra payment notices in both currencies reach the local owner inbox', async t => {
+  const f = await fixture(t);
+  for (const [currency, amount] of [['USD', '350'], ['NGN', '490000']]) {
+    const sent = await f.request('/api/requests', { method: 'POST', body: {
+      kind: 'payment', requestToken: crypto.randomUUID(), name: 'Synthetic Parent',
+      email: 'ultra@example.invalid', plan: 'Ultra', currency, amount,
+      transferReference: 'TEST-ULTRA', message: ''
+    } });
+    assert.equal(sent.status, 201);
+  }
+  const cookie = await f.login();
+  const list = await f.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.equal(list.json.total, 2);
+  for (const [currency, amount] of [['USD', '350.00'], ['NGN', '490000.00']]) {
+    const row = list.json.requests.find(row => row.details.currency === currency);
+    assert.equal(row.details.plan, 'Ultra');
+    assert.equal(row.details.amount, amount);
+    assert.match(row.details.verification, /^Unverified/);
+  }
+});
+
 test('logout still revokes the local session after the API allowance is exhausted', async t => {
   const f = await fixture(t), cookie = await f.login();
   for (let i = 0; i < 149; i++) assert.equal((await f.request('/api/inbox/session', { cookie })).status, 200);

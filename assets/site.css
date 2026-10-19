@@ -631,7 +631,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   .faq-answer {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 0.25s ease;
+    transition: grid-template-rows .4s cubic-bezier(.22, 1, .36, 1);
   }
   .faq-answer > div { overflow: hidden; visibility: hidden; }
   .faq-item.open .faq-answer { grid-template-rows: 1fr; }
@@ -779,12 +779,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     color: var(--bg);
     white-space: nowrap;
   }
+  #pricing > .wrap { max-width: 1320px; }
   .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 20px;
     align-items: stretch;
   }
+  @media (max-width: 1200px) { .pricing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 1000px) { .pricing-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) { .pricing-grid { grid-template-columns: 1fr; } }
   .price-card {
@@ -839,6 +841,39 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   .price-card li:last-child { border-bottom: none; }
   .price-card li .mark { font-weight: bold; }
   .price-card .btn-primary, .price-card .btn-secondary { text-align: center; font-size: 14px; padding: 12px 20px; }
+  /* A warm gold accent gives Ultra its own finish beside the recommended plan. */
+  #ultra-plan {
+    border: 2px solid #c9ad73;
+    background: linear-gradient(155deg, #fffaf0 0%, #fffdf8 35%, #fff 75%);
+    box-shadow: 0 6px 20px rgba(94, 72, 27, 0.07), 0 0 22px 3px rgba(203, 166, 85, 0.14);
+  }
+  #ultra-plan h3 { color: #604817; }
+  #ultra-plan .price { color: #604817; }
+  #ultra-plan .price-naira { color: #766342; }
+  #ultra-plan li { border-bottom-color: #e7ddc8; }
+  #ultra-plan li .mark { color: #89600a; }
+  #ultra-plan .plan-benefits summary { color: #6b4d14; text-decoration-color: #c9ad73; }
+  .price-card .btn-ultra {
+    background: linear-gradient(115deg, #805b10, #946d18 55%, #89600a);
+    color: #fff;
+    border-color: #89600a;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 4px 10px rgba(137, 96, 10, 0.14);
+  }
+  .price-card .btn-ultra:hover, .price-card .btn-ultra:focus-visible {
+    background: linear-gradient(115deg, #73500b, #8b6415 55%, #79540a);
+    color: #fff;
+    border-color: #79540a;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 6px 14px rgba(137, 96, 10, 0.2);
+  }
+  .price-card .btn-ultra:focus-visible { outline: 2px solid #89600a; outline-offset: 4px; }
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    #ultra-plan:hover, #ultra-plan:focus-within {
+      transform: translateY(-5px);
+      border-color: #b69551;
+      box-shadow: 0 12px 26px rgba(94, 72, 27, 0.1), 0 0 24px 3px rgba(203, 166, 85, 0.18);
+    }
+    #ultra-plan .btn-ultra:hover { transform: translateY(-2px); }
+  }
   .capacity-note {
     margin-top: 34px;
     border: 2px solid var(--line);
@@ -1002,56 +1037,53 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     section.banner-section { padding: 64px 0; }
   }
 
-  /* SCROLL-IN BOUNCE REVEALS — only active when JS is running */
+  /* Staggered scroll entrances; content stays visible without JavaScript. */
   .js .reveal {
     opacity: 0;
-    transform: translateY(28px) scale(0.96);
-    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translateY(22px);
   }
   :where(.js) .reveal.in-view {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
-  .js .reveal.d1 { transition-delay: 0.08s; }
-  .js .reveal.d2 { transition-delay: 0.16s; }
-  .js .reveal.d3 { transition-delay: 0.24s; }
-  .js .reveal.d4 { transition-delay: 0.32s; }
-  /* Hover and focus feedback should respond immediately after a reveal. */
-  .js .reveal.in-view { transition-delay: 0s; }
-
-  /* HERO ENTRANCE BOUNCE */
-  @keyframes bounceIn {
-    0% { opacity: 0; transform: translateY(40px) scale(0.9); }
-    60% { opacity: 1; transform: translateY(-8px) scale(1.02); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+  .js .reveal.d1 { --reveal-delay: 0.06s; }
+  .js .reveal.d2 { --reveal-delay: 0.12s; }
+  .js .reveal.d3 { --reveal-delay: 0.18s; }
+  .js .reveal.d4 { --reveal-delay: 0.24s; }
+  @keyframes beyondclass-surface-in {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: none; }
   }
-  .glass-panel { animation: bounceIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  @media (prefers-reduced-motion: no-preference) {
+    .js .reveal.in-view { animation: beyondclass-surface-in .75s cubic-bezier(.22, 1, .36, 1) var(--reveal-delay, 0s) backwards; }
+    .glass-panel { animation: beyondclass-surface-in .8s cubic-bezier(.22, 1, .36, 1) backwards; }
+  }
 
-  /* HOVER BOUNCES — desktop / cursor devices only */
+  /* Gentle hover feedback — desktop / cursor devices only. */
   .btn-primary, .btn-secondary, .btn-invert, .btn-outline-light, .btn-whatsapp,
   .why-card, .price-card, .confidence-card, .vet-step, .trust-card, .rigor-grid img, .vetting-photo img,
   .faq-question, .submit-btn, .burger, .close-btn, nav.links a, .footer-links a {
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, background 0.2s ease, opacity 0.2s ease;
+    transition: transform .35s cubic-bezier(.22, 1, .36, 1), box-shadow .35s ease, background .25s ease, border-color .25s ease, opacity .25s ease;
   }
   @media (hover: hover) and (pointer: fine) {
     .btn-primary:hover, .btn-secondary:hover, .btn-invert:hover, .btn-outline-light:hover, .btn-whatsapp:hover,
     .submit-btn:not(:disabled):hover, .burger:hover, .close-btn:hover {
-      transform: translateY(-4px) scale(1.06);
+      transform: translateY(-2px);
     }
     .why-card:hover, .price-card:hover, .confidence-card:hover, .trust-card:hover {
-      transform: translateY(-8px) scale(1.02);
-      box-shadow: 0 14px 0 0 var(--line);
+      transform: translateY(-5px);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, .1);
     }
-    .vet-step:hover { transform: translateX(6px) scale(1.01); }
-    .rigor-grid img:hover, .vetting-photo img:hover { transform: scale(1.03) rotate(-0.5deg); }
-    .faq-question:hover { transform: translateX(4px); }
-    nav.links a:hover, .footer-links a:hover { transform: translateY(-3px); }
+    .vet-step:hover { transform: translateX(3px); }
+    .rigor-grid img:hover, .vetting-photo img:hover { transform: scale(1.02); }
+    .faq-question:hover { transform: translateX(2px); }
+    nav.links a:hover, .footer-links a:hover { transform: translateY(-1px); }
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .price-card:focus-within, .confidence-card:focus-within {
-      transform: translateY(-8px) scale(1.02);
-      box-shadow: 0 14px 0 0 var(--line);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, .1);
     }
   }
 
@@ -1126,10 +1158,10 @@ nav.links a[aria-current="page"] { border-bottom-color: currentColor; }
 .footer-navigation { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; padding: 8px 0 34px; margin-bottom: 26px; border-bottom: 2px solid var(--line-soft); }
 .footer-navigation h2 { font-size: 17px; margin: 0 0 12px; }
 .footer-navigation a { display: block; width: fit-content; margin: 8px 0; text-underline-offset: 4px; }
-.footer-navigation a, .mobile-menu nav a, .breadcrumb a { transition: transform .35s cubic-bezier(.34, 1.56, .64, 1); }
+.footer-navigation a, .mobile-menu nav a, .breadcrumb a { transition: transform .3s cubic-bezier(.22, 1, .36, 1), opacity .25s ease; }
 .footer-navigation a:focus-visible, .mobile-menu nav a:focus-visible, .breadcrumb a:focus-visible { transform: translateX(4px); }
 @media (hover: hover) and (pointer: fine) {
-  .page-card:hover, .js .page-card.reveal.in-view:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 14px 0 var(--line); }
+  .page-card:hover, .js .page-card.reveal.in-view:hover { transform: translateY(-5px); box-shadow: 0 16px 36px rgba(0, 0, 0, .1); }
   .footer-navigation a:hover, .mobile-menu nav a:hover, .breadcrumb a:hover { transform: translateX(4px); }
 }
 .footer-navigation a[aria-current="page"] { font-weight: bold; text-decoration-thickness: 3px; }
@@ -1261,7 +1293,8 @@ form.booking button.submit-btn:disabled { opacity: .55; cursor: not-allowed; }
 .vetting-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 40px; }
 .vetting-steps > .vet-step { border-top: 3px solid var(--line); padding: 20px 0 0; }
 .founder-profile { display: flex; align-items: center; gap: 18px; margin-top: 30px; }
-.founder-profile img { display: block; width: 80px; height: 80px; flex: 0 0 80px; border-radius: 50%; border: 2px solid var(--line); object-fit: cover; object-position: 50% 40%; filter: grayscale(1); }
+.founder-avatar { width: 80px; height: 80px; flex: 0 0 80px; border-radius: 50%; border: 2px solid var(--line); overflow: hidden; background: #eee; }
+.founder-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0%; filter: grayscale(1); transform: scale(1.8); transform-origin: 50% 25%; }
 .founder-profile p { margin: 0; }
 .founder-profile .founder-name { font-size: 19px; color: var(--ink); }
 .founder-profile .founder-role { font-size: 13px; }
@@ -1327,13 +1360,13 @@ form.booking button.submit-btn:disabled { opacity: .55; cursor: not-allowed; }
 .media-free .card-media { object-fit: contain; object-position: center 8%; background: #fff; }
 .media-answers .card-media { object-position: center 20%; }
 @media (hover: hover) and (pointer: fine) { .media-card:hover .card-media { transform: scale(1.04); } }
-@media (prefers-reduced-motion: no-preference) { .media-teaching:focus-within { transform: translateY(-8px) scale(1.02); box-shadow: 0 14px 0 var(--line); } }
+@media (prefers-reduced-motion: no-preference) { .media-teaching:focus-within { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(0, 0, 0, .1); } }
 @media (prefers-reduced-motion: reduce) { .media-card .card-media { transition: none; } .media-card:hover .card-media { transform: none; } }
 
 /* Subtle text entrances and directional cues, using the established brand. */
 @keyframes beyondclass-headline {
-  from { opacity: 0; transform: translateY(14px); filter: blur(3px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes beyondclass-intro {
   from { opacity: 0; transform: translateY(9px); }
@@ -1429,4 +1462,92 @@ form.booking button.submit-btn:disabled { opacity: .55; cursor: not-allowed; }
   .analytics-heading .field { flex: auto; width: 100%; }
   .analytics-totals { gap: 10px; }
   .analytics-totals > div { padding: 12px; }
+}
+
+/* Refined monochrome surfaces; Ultra keeps its separate gold treatment. */
+header.site-nav {
+  border-bottom-width: 1px;
+  transition: background .35s ease, border-color .35s ease, box-shadow .35s ease;
+}
+header.site-nav.scrolled {
+  background: rgba(255, 255, 255, .94);
+  border-bottom: 1px solid rgba(10, 10, 10, .12);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, .055);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+nav.links a { position: relative; border-bottom-width: 0; padding-bottom: 4px; }
+nav.links a::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+nav.links a[aria-current="page"]::after,
+nav.links a:is(:hover, :focus-visible)::after { transform: scaleX(1); }
+main > section:not(.page-hero):not(.photo-banner):not(.banner-section) {
+  border-bottom-width: 1px;
+  border-bottom-color: rgba(10, 10, 10, .13);
+}
+.section-head { margin-bottom: clamp(32px, 4vw, 52px); }
+.trust { border-bottom: 1px solid rgba(10, 10, 10, .13); }
+h2.section-title { line-height: 1.23; letter-spacing: -.025em; }
+.section-desc { line-height: 1.8; }
+.kicker { border-width: 1px; letter-spacing: .035em; }
+.why-card, .page-card, .trust-card, .confidence-card, .price-card {
+  border-width: 1px;
+  border-color: rgba(10, 10, 10, .2);
+  border-radius: 20px;
+  box-shadow: 0 5px 22px rgba(0, 0, 0, .035);
+}
+.price-card { background: linear-gradient(155deg, #fff, #fcfcfc); }
+.price-card.featured { border: 2px solid #171717; box-shadow: 0 8px 28px rgba(0, 0, 0, .065); }
+.trust-card { background: rgba(255, 255, 255, .97); }
+.faq-list, .faq-item { border-width: 1px; border-color: rgba(10, 10, 10, .18); }
+form.booking, .payment-summary, .bank-transfer, .lesson-terms {
+  border-width: 1px;
+  border-color: rgba(10, 10, 10, .18);
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fff, #fafafa);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .035);
+}
+.transfer-notice form.booking { box-shadow: none; }
+form.booking input, form.booking select, form.booking textarea {
+  border-width: 1px;
+  border-color: #b8b8b8;
+  border-radius: 12px;
+  background: #fff;
+}
+form.booking input:focus, form.booking select:focus, form.booking textarea:focus {
+  border-color: #171717;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, .045);
+}
+.btn-primary, .btn-whatsapp, form.booking button.submit-btn {
+  background: linear-gradient(140deg, #282828, #080808);
+  border-color: #171717;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 4px 12px rgba(0, 0, 0, .07);
+}
+.btn-secondary:not(.btn-ultra) { border-color: #969696; background: rgba(255, 255, 255, .8); }
+.btn-invert { background: linear-gradient(140deg, #fff, #f1f1f1); }
+.btn-primary:hover, .btn-whatsapp:hover { opacity: 1; box-shadow: 0 7px 20px rgba(0, 0, 0, .13); }
+.worksheet-preview { border-width: 1px; border-color: #bbb; box-shadow: 0 10px 28px rgba(0, 0, 0, .08); }
+.footer-navigation { border-bottom-width: 1px; }
+@keyframes beyondclass-photo-drift {
+  from { transform: translateY(-2%) scale(1.06); }
+  to { transform: translateY(2%) scale(1.06); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  nav.links a::after { transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
+  form.booking input, form.booking select, form.booking textarea { transition: border-color .25s ease, box-shadow .25s ease; }
+  .mobile-menu.open { animation: beyondclass-intro .3s ease-out backwards; }
+  @supports (animation-timeline: view()) {
+    .photo-banner .banner-photo {
+      animation: beyondclass-photo-drift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+    }
+  }
 }

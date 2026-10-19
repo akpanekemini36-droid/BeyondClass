@@ -39,6 +39,27 @@ function fixture({ password = PASSWORD, store = memoryStore() } = {}) {
 }
 const material = extra => ({ kind: 'materials', requestToken: crypto.randomBytes(16).toString('hex'), email: 'parent@example.invalid', grade: 'Year 7', topic: 'Fractions', ...extra });
 
+test('Ultra payment notices in both currencies reach the hosted owner inbox', async () => {
+  const f = fixture();
+  for (const [currency, amount] of [['USD', '350'], ['NGN', '490000']]) {
+    const sent = await f.request('/api/requests', { method: 'POST', body: {
+      kind: 'payment', requestToken: crypto.randomUUID(), name: 'Synthetic Parent',
+      email: 'ultra@example.invalid', plan: 'Ultra', currency, amount,
+      transferReference: 'TEST-ULTRA', message: ''
+    } });
+    assert.equal(sent.status, 201);
+  }
+  const cookie = await f.login();
+  const list = await f.request('/api/inbox/requests?kind=payment', { cookie });
+  assert.equal(list.json.total, 2);
+  for (const [currency, amount] of [['USD', '350.00'], ['NGN', '490000.00']]) {
+    const row = list.json.requests.find(row => row.details.currency === currency);
+    assert.equal(row.details.plan, 'Ultra');
+    assert.equal(row.details.amount, amount);
+    assert.match(row.details.verification, /^Unverified/);
+  }
+});
+
 test('saved requests and read counts recover from failed index writes without a parent retry', async () => {
   for (const mode of ['throw', 'conflict']) {
     const f = fixture(), cookie = await f.login();

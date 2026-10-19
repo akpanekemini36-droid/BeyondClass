@@ -28,6 +28,47 @@ function element() {
     querySelectorAll() { return []; }, reset() {}, reportValidity() { return true; }
   };
 }
+
+test('Ultra checkout carries its currency, amount and lesson terms into the bank transfer notice', () => {
+  const nodes = new Map();
+  const get = id => {
+    if (!nodes.has(id)) nodes.set(id, element());
+    return nodes.get(id);
+  };
+  get('checkoutPlan').value = 'Flexible';
+  get('checkoutCurrency').value = 'USD';
+  const context = vm.createContext({
+    document: { getElementById: get, querySelectorAll: () => [] },
+    window: { location: { search: '?plan=Ultra&currency=NGN' } },
+    URLSearchParams, URL, Intl
+  });
+  vm.runInContext(source('assets/checkout-config.js'), context);
+  vm.runInContext(source('assets/checkout.js'), context);
+  assert.equal(get('checkoutPlan').value, 'Ultra');
+  assert.equal(get('summaryPlan').textContent, 'Ultra');
+  assert.match(get('summaryPrice').textContent, /490,000 \/ calendar month/);
+  assert.equal(get('bankSelectedAmount').textContent, get('summaryPrice').textContent);
+  assert.equal(get('transferAmount').value, 490000);
+  assert.equal(get('transferPlan').textContent, 'Ultra');
+  assert.match(get('summaryDetail').textContent, /Four private 90-minute lessons per week/);
+  assert.equal(get('checkoutContact').href, 'contact.html?plan=Ultra#contact');
+  assert.match(get('bankTransferHeading').textContent, /OPay/);
+
+  get('checkoutCurrency').value = 'USD';
+  get('checkoutCurrency').listeners.change();
+  assert.equal(get('summaryPrice').textContent, '$350 / calendar month');
+  assert.equal(get('bankSelectedAmount').textContent, '$350 / calendar month');
+  assert.equal(get('transferAmount').value, 350);
+  assert.match(get('bankTransferHeading').textContent, /Cleva/);
+  get('transferAmount').value = '175';
+  get('checkoutCurrency').listeners.change();
+  assert.equal(get('transferAmount').value, '175', 'preserve the amount actually sent');
+  get('checkoutPlan').value = 'Flexible';
+  get('checkoutPlan').listeners.change();
+  assert.equal(get('summaryPrice').textContent, '$160 / calendar month');
+  assert.equal(get('transferAmount').value, 160);
+  assert.match(get('summaryDetail').textContent, /Three 90-minute lessons/);
+});
 function inboxFixture() {
   const nodes = new Map(), requests = [], events = {};
   const get = id => {
