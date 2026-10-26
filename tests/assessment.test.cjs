@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'../assessment.html'),'utf8');
-const script=html.match(/<script>([\s\S]*?)<\/script>/)[1],ctx={};
+const script=html.match(/<script>([\s\S]*?)<\/script>/)[1],ctx={};new vm.Script(script);
 vm.runInNewContext(script.slice(0,script.indexOf('const CONFIG'))+';globalThis.lib={BANK,numeric,correct,chooseQuestion,advance,analyse}',ctx);const lib=ctx.lib;
 test('assessment has unique items, clear keys and four distinct multiple-choice options',()=>{assert.equal(lib.BANK.length,100);assert.equal(new Set(lib.BANK.map(q=>q.id)).size,100);for(const q of lib.BANK){assert(lib.correct(q,q.answer));if(q.options){assert.equal(q.options.length,4);assert.equal(new Set(q.options).size,4);assert.equal(q.options.filter(o=>lib.correct(q,o)).length,1)}}});
 test('fraction input accepts mathematical equivalents without evaluating expressions',()=>{assert.equal(lib.numeric('1 5/12'),17/12);assert.equal(lib.numeric('-1 1/2'),-1.5);assert(Number.isNaN(lib.numeric('1/0')));assert(Number.isNaN(lib.numeric('2+3')));assert(lib.correct(lib.BANK.find(q=>q.id==='d1l4q0'),'17/12'))});
