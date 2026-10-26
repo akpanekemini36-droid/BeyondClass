@@ -26,6 +26,7 @@
 
 
 <link rel="stylesheet" href="assets/site.css">
+<script src="assets/plans.js" defer></script>
 <script src="assets/site.js" defer></script>
 <script src="assets/checkout-config.js" defer></script>
 <script src="assets/checkout.js" defer></script>
@@ -67,19 +68,19 @@
 </ol>
 <form class="booking" id="checkoutForm" method="post" aria-labelledby="checkoutHeading">
 <h2 id="checkoutHeading">Review your plan.</h2>
-<div class="field"><label for="checkoutPlan">Tutoring plan</label><select id="checkoutPlan" name="plan"><option value="Flexible" selected>Flexible — Best plan</option><option value="Ultra">BeyondClass Ultra</option><option>Premium</option><option>Growth</option><option>Starter</option><option>Confidence Week</option></select></div>
+<div class="field"><label for="checkoutPlan">Tutoring plan</label><select id="checkoutPlan" name="plan"><option value="Essential">Essential</option><option value="Growth" selected>Growth — Recommended</option><option value="Ultra">Ultra</option><option>Confidence Week</option></select></div>
 <div class="field"><label for="checkoutCurrency">Currency</label><select id="checkoutCurrency" name="currency"><option value="USD">US Dollar (USD)</option><option value="NGN">Nigerian Naira (NGN)</option></select></div>
-<p id="selectedPaymentPrice" class="selected-payment-price" aria-live="polite">$160 / calendar month</p>
+<p id="selectedPaymentPrice" class="selected-payment-price" aria-live="polite">$160 / 4 weeks</p>
 <p id="cardCheckoutDescription" hidden>Pay by card through Stripe, or use the bank details below for your selected currency.</p>
 <button type="submit" class="submit-btn" id="checkoutButton" hidden disabled>Continue to Stripe checkout</button>
 <p id="checkoutStatus" class="form-status visible" role="status">Pay in US dollars using the bank details below. Confirm your enrollment and amount before transferring.</p>
-<p><a id="checkoutContact" href="contact.html?plan=Flexible#contact">Contact us about this plan</a></p>
+<p><a id="checkoutContact" href="contact.html?plan=Growth#contact">Contact us about this plan</a></p>
 <noscript><p>Enable JavaScript to review your selection. You can also <a href="contact.html">contact us</a> about enrollment and payment.</p></noscript>
 </form>
 <section id="bankTransfer" class="bank-transfer" aria-labelledby="bankTransferHeading">
 <span class="kicker" id="bankTransferCurrency">USD bank transfer</span>
 <h2 id="bankTransferHeading">Pay with the Cleva bank details.</h2>
-<p class="bank-amount" aria-live="polite"><span id="bankSelectedPlan">Flexible</span><strong id="bankSelectedAmount">$160 / calendar month</strong><span>Confirm the billing period and amount with us before transferring.</span></p>
+<p class="bank-amount" aria-live="polite"><span id="bankSelectedPlan">Growth</span><strong id="bankSelectedAmount">$160 / 4 weeks</strong><span>Confirm the billing period and amount with us before transferring.</span></p>
 <p id="bankTransferInstructions">Copy these details into your bank or payment app and send US dollars by ACH or domestic wire. The transfer takes place in your bank app.</p>
 <dl class="bank-details">
 <div><dt>Account name</dt><dd><span id="bankAccountName">Ekemini Itoro Akpan</span><button type="button" class="copy-detail" data-copy-target="bankAccountName" aria-label="Copy account name" disabled>Copy</button></dd></div>
@@ -96,7 +97,7 @@
 <summary>I’ve sent my transfer</summary>
 <form class="booking" id="transferNoticeForm" method="post" aria-labelledby="transferNoticeHeading">
 <h3 id="transferNoticeHeading">Let us know so we can check.</h3>
-<p>Selected plan: <strong id="transferPlan">Flexible</strong>. Submit this notice after making your transfer. We’ll check the receiving account and email you within 24 hours after the funds arrive and we receive your notice.</p>
+<p>Selected plan: <strong id="transferPlan">Growth</strong>. Submit this notice after making your transfer. We’ll check the receiving account and email you within 24 hours after the funds arrive and we receive your notice.</p>
 <div hidden aria-hidden="true"><label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
 <div class="field"><label for="transferParentName">Your name</label><input id="transferParentName" name="parentName" autocomplete="name" required maxlength="100"></div>
 <div class="field"><label for="transferEmail">Email address</label><input type="email" id="transferEmail" name="email" autocomplete="email" required maxlength="254"></div>
@@ -112,7 +113,7 @@
 </section>
 </div>
 <aside class="payment-summary" aria-labelledby="summaryHeading"><h2 id="summaryHeading">Your selection</h2>
-<div aria-live="polite" aria-atomic="true"><dl><dt>Plan</dt><dd id="summaryPlan">Flexible</dd><dt>Listed price</dt><dd id="summaryPrice">$160 / calendar month</dd></dl><p id="summaryDetail">Three 90-minute lessons per week during the calendar month. Confirm the billing dates and exact lesson count before payment. All Premium benefits, flexible rescheduling, limited tutor-approved extra lessons and an optional monthly parent call.</p></div>
+<div aria-live="polite" aria-atomic="true"><dl><dt>Plan</dt><dd id="summaryPlan">Growth</dd><dt>Listed price</dt><dd id="summaryPrice">$160 / 4 weeks</dd></dl><p id="summaryDetail">Three private 90-minute lessons per week: 12 lessons and 18 hours every four weeks. Interactive tools, weekly parent updates, personalized practice, WhatsApp support and assessments every two months.</p></div>
 <p class="payment-note">Confirm your enrollment and billing period with us before paying. A 50% part payment secures your spot once you have chosen your plan.</p>
 <p class="payment-note">For part payments or a quote in Pounds, <a href="contact.html">contact us</a>. The Confidence Week deposit has its own terms on the Pricing page.</p>
 <p class="payment-note">Rescheduling requires at least two hours’ notice. <a href="pricing.html#lesson-terms">Read lesson and billing terms</a>.</p>

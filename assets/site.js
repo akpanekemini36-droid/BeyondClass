@@ -543,15 +543,26 @@
   /* Plan buttons carry their plan name into the booking form          */
   /* ---------------------------------------------------------------- */
   var planSelect = document.getElementById('planInterest');
+  function updateBookingPrice() {
+    var summary = document.getElementById('bookingPlanPrice');
+    var plans = window.BEYONDCLASS_PLANS;
+    if (!summary || !plans || !planSelect) return;
+    var selected = Object.prototype.hasOwnProperty.call(plans, planSelect.value) && plans[planSelect.value];
+    summary.textContent = selected
+      ? '$' + selected.USD.toLocaleString('en-US') + ' / ' + selected.period + ' · ₦' + selected.NGN.toLocaleString('en-NG') + ' / ' + selected.period
+      : 'Not sure yet? We’ll help you choose a plan during your free trial.';
+  }
   if (planSelect) {
     var requestedPlan = new URLSearchParams(window.location.search).get('plan');
     if (Array.from(planSelect.options).some(function (option) { return option.value === requestedPlan; })) {
       planSelect.value = requestedPlan;
     }
+    planSelect.addEventListener('change', updateBookingPrice);
+    updateBookingPrice();
   }
   document.querySelectorAll('a[data-plan]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      if (planSelect) planSelect.value = btn.getAttribute('data-plan');
+      if (planSelect) { planSelect.value = btn.getAttribute('data-plan'); updateBookingPrice(); }
     });
   });
 
@@ -600,7 +611,10 @@
           throw new Error(result && result.error ? result.error : 'Your request could not be saved. Please try again.');
         }
         var editedWhileSending = JSON.stringify(build()) !== requestPayload;
-        if (!editedWhileSending) form.reset();
+        if (!editedWhileSending) {
+          form.reset();
+          if (formId === 'bookingForm') updateBookingPrice();
+        }
         delete form.dataset.requestToken;
         delete form.dataset.requestPayload;
         statusEl.textContent = (payload.kind === 'payment'

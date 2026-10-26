@@ -286,7 +286,7 @@ test('request index revisions reject delayed stale status updates and preserve c
 
 test('Netlify saves USD notices without claiming payment receipt and filters them across instances', async () => {
   const f = fixture(), next = fixture({ store: f.store });
-  const body = { kind: 'payment', requestToken: crypto.randomUUID(), name: 'Synthetic Parent', email: 'transfer@example.invalid', plan: 'Flexible', currency: 'USD', amount: '200', transferReference: 'TEST-TRANSFER', message: '', verification: 'Paid' };
+  const body = { kind: 'payment', requestToken: crypto.randomUUID(), name: 'Synthetic Parent', email: 'transfer@example.invalid', plan: 'Growth', currency: 'USD', amount: '160', transferReference: 'TEST-TRANSFER', message: '', verification: 'Paid' };
   const sent = await f.request('/api/requests', { method: 'POST', body });
   assert.equal(sent.status, 201);
   assert.equal((await next.request('/api/requests', { method: 'POST', body })).json.reference, sent.json.reference);
@@ -295,15 +295,15 @@ test('Netlify saves USD notices without claiming payment receipt and filters the
   const cookie = await next.login();
   const list = await next.request('/api/inbox/requests?kind=payment', { cookie });
   assert.equal(list.json.total, 1);
-  assert.equal(list.json.requests[0].details.amount, '200.00');
+  assert.equal(list.json.requests[0].details.amount, '160.00');
   assert.equal(list.json.requests[0].details.currency, 'USD');
   assert.match(list.json.requests[0].details.verification, /^Unverified/);
-  const naira = await next.request('/api/requests', { method: 'POST', body: { ...body, requestToken: crypto.randomUUID(), currency: 'NGN', amount: '280000' } });
+  const naira = await next.request('/api/requests', { method: 'POST', body: { ...body, requestToken: crypto.randomUUID(), currency: 'NGN', amount: '224000' } });
   assert.equal(naira.status, 201);
   const combined = await f.request('/api/inbox/requests?kind=payment', { cookie });
   assert.equal(combined.json.total, 2);
   const opay = combined.json.requests.find(row => row.reference === naira.json.reference);
-  assert.equal(opay.details.amount, '280000.00');
+  assert.equal(opay.details.amount, '224000.00');
   assert.match(opay.details.verification, /OPay/);
   for (const changed of [{ amount: '0' }, { amount: '1.001' }, { currency: 'GBP' }, { transferReference: '' }, { plan: 'Unknown' }]) {
     assert.equal((await next.request('/api/requests', { method: 'POST', body: { ...body, ...changed, requestToken: crypto.randomUUID() } })).status, 422);

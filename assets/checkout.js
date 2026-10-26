@@ -7,14 +7,7 @@
   var button = document.getElementById('checkoutButton');
   var status = document.getElementById('checkoutStatus');
   var lastTransferSelection;
-  var plans = {
-    Starter: { USD: 16.8, NGN: 24000, period: 'lesson', detail: 'One 90-minute lesson per payment, scheduled once per week.' },
-    Growth: { USD: 28.8, NGN: 40000, period: 'week', detail: 'Two 90-minute lessons per weekly payment, with between-lesson support and detailed progress updates.' },
-    Premium: { USD: 45.6, NGN: 64000, period: 'week', detail: 'Three 90-minute lessons per weekly payment, dedicated chat response staff and an optional monthly parent call.' },
-    Flexible: { USD: 160, NGN: 224000, period: 'calendar month', detail: 'Three 90-minute lessons per week during the calendar month. Confirm the billing dates and exact lesson count before payment. All Premium benefits, flexible rescheduling, limited tutor-approved extra lessons and an optional monthly parent call.' },
-    Ultra: { USD: 350, NGN: 490000, period: 'calendar month', detail: 'Four private 90-minute lessons per week during the calendar month. Everything in Flexible, plus exclusive personalized interactive learning tools, a cognitive skills assessment with a parent report, tailored exam preparation, priority academic support between sessions and an optional monthly parent strategy meeting with detailed progress notes. Confirm the billing dates and exact lesson count before payment.' },
-    'Confidence Week': { USD: 19.99, NGN: 29999, period: 'deposit', detail: 'One week at your chosen plan’s pace: one, two, three or four lessons, with dates and count confirmed before payment. Deposit credited towards your first month if you enroll; half refunded if you decide not to continue.' }
-  };
+  var plans = window.BEYONDCLASS_PLANS;
   var params = new URLSearchParams(window.location.search);
   if (Object.prototype.hasOwnProperty.call(plans, params.get('plan'))) planSelect.value = params.get('plan');
   if (['USD', 'NGN'].includes(params.get('currency'))) currencySelect.value = params.get('currency');

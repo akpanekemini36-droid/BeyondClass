@@ -77,7 +77,7 @@
     summary.append(node('span', request.reference + ' · ' + date, 'inbox-request-meta'));
     card.append(summary);
     var fields = node('dl');
-    var labels = { name: 'Parent', email: 'Email', grade: 'Grade / year', topic: 'Topic', curriculum: 'Curriculum', timeZone: 'Time zone', availability: 'Preferred availability', plan: 'Plan', currency: 'Currency', amount: 'Reported amount', transferReference: 'Transfer reference / sender name', verification: 'Payment verification', message: 'Notes' };
+    var labels = { name: 'Parent', email: 'Email', grade: 'Grade / year', topic: 'Topic', curriculum: 'Curriculum', timeZone: 'Time zone', availability: 'Preferred availability', plan: 'Plan', planPrice: 'Listed package price', currency: 'Currency', amount: 'Reported amount', transferReference: 'Transfer reference / sender name', verification: 'Payment verification', message: 'Notes' };
     Object.keys(labels).forEach(function (key) {
       if (!request.details[key]) return;
       fields.append(node('dt', labels[key]), node('dd', request.details[key]));

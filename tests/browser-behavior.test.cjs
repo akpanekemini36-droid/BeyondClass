@@ -35,18 +35,19 @@ test('Ultra checkout carries its currency, amount and lesson terms into the bank
     if (!nodes.has(id)) nodes.set(id, element());
     return nodes.get(id);
   };
-  get('checkoutPlan').value = 'Flexible';
+  get('checkoutPlan').value = 'Growth';
   get('checkoutCurrency').value = 'USD';
   const context = vm.createContext({
     document: { getElementById: get, querySelectorAll: () => [] },
     window: { location: { search: '?plan=Ultra&currency=NGN' } },
     URLSearchParams, URL, Intl
   });
+  vm.runInContext(source('assets/plans.js'), context);
   vm.runInContext(source('assets/checkout-config.js'), context);
   vm.runInContext(source('assets/checkout.js'), context);
   assert.equal(get('checkoutPlan').value, 'Ultra');
   assert.equal(get('summaryPlan').textContent, 'Ultra');
-  assert.match(get('summaryPrice').textContent, /490,000 \/ calendar month/);
+  assert.match(get('summaryPrice').textContent, /490,000 \/ 4 weeks/);
   assert.equal(get('bankSelectedAmount').textContent, get('summaryPrice').textContent);
   assert.equal(get('transferAmount').value, 490000);
   assert.equal(get('transferPlan').textContent, 'Ultra');
@@ -56,18 +57,30 @@ test('Ultra checkout carries its currency, amount and lesson terms into the bank
 
   get('checkoutCurrency').value = 'USD';
   get('checkoutCurrency').listeners.change();
-  assert.equal(get('summaryPrice').textContent, '$350 / calendar month');
-  assert.equal(get('bankSelectedAmount').textContent, '$350 / calendar month');
+  assert.equal(get('summaryPrice').textContent, '$350 / 4 weeks');
+  assert.equal(get('bankSelectedAmount').textContent, '$350 / 4 weeks');
   assert.equal(get('transferAmount').value, 350);
   assert.match(get('bankTransferHeading').textContent, /Cleva/);
   get('transferAmount').value = '175';
   get('checkoutCurrency').listeners.change();
   assert.equal(get('transferAmount').value, '175', 'preserve the amount actually sent');
-  get('checkoutPlan').value = 'Flexible';
+  get('checkoutPlan').value = 'Growth';
   get('checkoutPlan').listeners.change();
-  assert.equal(get('summaryPrice').textContent, '$160 / calendar month');
+  assert.equal(get('summaryPrice').textContent, '$160 / 4 weeks');
   assert.equal(get('transferAmount').value, 160);
-  assert.match(get('summaryDetail').textContent, /Three 90-minute lessons/);
+  assert.match(get('summaryDetail').textContent, /Three private 90-minute lessons/);
+  for (const [plan, usd, ngn] of [['Essential', 120, 168000], ['Growth', 160, 224000], ['Ultra', 350, 490000]]) {
+    get('checkoutPlan').value = plan;
+    for (const [currency, amount] of [['USD', usd], ['NGN', ngn]]) {
+      get('checkoutCurrency').value = currency;
+      get('checkoutPlan').listeners.change();
+      assert.equal(get('transferAmount').value, amount);
+      assert.equal(get('summaryPlan').textContent, plan);
+      assert.match(get('summaryPrice').textContent, /4 weeks$/);
+      assert.equal(get('bankSelectedAmount').textContent, get('summaryPrice').textContent);
+      assert.equal(get('checkoutContact').href, 'contact.html?plan=' + plan + '#contact');
+    }
+  }
 });
 function inboxFixture() {
   const nodes = new Map(), requests = [], events = {};

@@ -113,12 +113,12 @@ test('USD transfer notices remain unverified, private, retry-safe and separately
   await f.request('/api/inbox/requests/' + saved.id, { method: 'PATCH', cookie, body: { status: 'read' } });
   const read = await f.request('/api/inbox/requests?kind=payment', { cookie });
   assert.match(read.json.requests[0].details.verification, /^Unverified/);
-  const naira = await f.request('/api/requests', { method: 'POST', body: { ...body, requestToken: crypto.randomUUID(), plan: 'Flexible', currency: 'NGN', amount: '280000' } });
+  const naira = await f.request('/api/requests', { method: 'POST', body: { ...body, requestToken: crypto.randomUUID(), plan: 'Growth', currency: 'NGN', amount: '224000' } });
   assert.equal(naira.status, 201);
   const combined = await f.request('/api/inbox/requests?kind=payment', { cookie });
   assert.equal(combined.json.total, 2);
   const opay = combined.json.requests.find(row => row.reference === naira.json.reference);
-  assert.equal(opay.details.amount, '280000.00');
+  assert.equal(opay.details.amount, '224000.00');
   assert.match(opay.details.verification, /OPay/);
   for (const changed of [{ amount: '0' }, { amount: '-1' }, { amount: '1.234' }, { amount: 'NaN' }, { amount: '100000' }, { currency: 'GBP' }, { plan: 'Unknown' }, { transferReference: '' }]) {
     assert.equal((await f.request('/api/requests', { method: 'POST', body: { ...body, ...changed, requestToken: crypto.randomUUID() } })).status, 422);

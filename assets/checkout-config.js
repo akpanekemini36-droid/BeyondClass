@@ -14,10 +14,8 @@ window.BEYONDCLASS_CHECKOUT = {
     }
   },
   paymentLinks: {
-    Starter: { USD: '', NGN: '' },
+    Essential: { USD: '', NGN: '' },
     Growth: { USD: '', NGN: '' },
-    Premium: { USD: '', NGN: '' },
-    Flexible: { USD: '', NGN: '' },
     Ultra: { USD: '', NGN: '' },
     'Confidence Week': { USD: '', NGN: '' }
   }

@@ -26,6 +26,7 @@
 
 
 <link rel="stylesheet" href="assets/site.css">
+<script src="assets/plans.js" defer></script>
 <script src="assets/site.js" defer></script>
 </head>
 <body>
@@ -120,13 +121,12 @@
             <label for="planInterest">Plan you're interested in</label>
             <select id="planInterest" name="planInterest">
               <option value="Not sure yet">Not sure yet</option>
-              <option value="Flexible">Flexible — Best plan</option>
-              <option value="Ultra">BeyondClass Ultra</option>
-              <option value="Premium">Premium</option>
-              <option value="Growth">Growth</option>
-              <option value="Starter">Starter</option>
+              <option value="Essential">Essential — $120 / 4 weeks</option>
+              <option value="Growth">Growth — Recommended — $160 / 4 weeks</option>
+              <option value="Ultra">Ultra — $350 / 4 weeks</option>
               <option value="Confidence Week">Confidence Week</option>
             </select>
+            <p id="bookingPlanPrice" class="payment-note" aria-live="polite">Choose a plan to see its USD and naira price.</p>
           </div>
           <div class="field">
             <label for="message">What's been hard lately?</label>
