@@ -12,6 +12,12 @@ const { createClientAddressResolver } = require('./lib/client-address.cjs');
 const MIN_PASSWORD = 12, MAX_PASSWORD = 256;
 
 function createApp(options = {}) {
+  const { createAssessmentAccess } = require('./lib/assessment-access.cjs');
+  const assessment = createAssessmentAccess({
+    store: require('./lib/assessment-memory-store.cjs').createMemoryStore(),
+    codeHash: options.assessmentCodeHash || require('./lib/assessment-access-config.cjs').codeHash,
+    html: require('./private/assessment-app.cjs'), secure: process.env.COOKIE_SECURE === 'true'
+  });
   const clientAddress = createClientAddressResolver(options.trustedProxies ?? process.env.TRUSTED_PROXIES ?? '');
   const suppliedPassword = options.password || process.env.INBOX_PASSWORD;
   if (suppliedPassword && (typeof suppliedPassword !== 'string' || suppliedPassword.length < MIN_PASSWORD || suppliedPassword.length > MAX_PASSWORD)) {
@@ -205,6 +211,13 @@ function createApp(options = {}) {
     for (const [key, value] of Object.entries(securityHeaders([], process.env.COOKIE_SECURE === 'true'))) res.setHeader(key, value);
     try {
       const url = new URL(req.url, 'http://localhost');
+      if (url.pathname.startsWith('/assessment/')) {
+        const scheme = process.env.COOKIE_SECURE === 'true' ? 'https:' : 'http:';
+        const request = new Request(scheme + '//' + req.headers.host + req.url, { method: req.method, headers: req.headers, ...(['GET', 'HEAD'].includes(req.method) ? {} : { body: require('node:stream').Readable.toWeb(req), duplex: 'half' }) });
+        const result = await assessment(request, { ip: clientAddress(req) });
+        res.writeHead(result.status, Object.fromEntries(result.headers));
+        res.end(Buffer.from(await result.arrayBuffer())); return;
+      }
       if (url.pathname === '/inbox.html' || url.pathname.startsWith('/api/')) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       if (url.pathname.startsWith('/api/')) { await handleApi(req, res, url); return; }
       if (!['GET', 'HEAD'].includes(req.method)) throw fail(405, 'Method not allowed.');
