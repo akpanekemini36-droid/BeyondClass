@@ -15,3 +15,7 @@ Parent contact email is collected but is not a notification recipient. No API se
 Netlify build processing is enabled for form detection, with script/style minification disabled to preserve CSP hashes. The existing private inbox functions are unchanged. /assessment/start is served by the access function only after cookie verification, with no-store and noindex headers. Its inline-script CSP hash is generated from the private app contents.
 
 Change the BANK array to revise questions; review explanations and test all routes after changes. Assessment answers are in the browser source; this is a low-stakes learning tool, not a secure exam.
+
+## Delivery verification - 26 October 2026
+
+Netlify detected the maths-assessment form. Its notification was saved specifically for that form to hellobeyondclass@gmail.com. Synthetic launch check BC-LAUNCH-CHECK-20261026 was received in Verified submissions, and the owner confirmed the test email arrived. The hosted app now enables report submission. The offline preview remains delivery-disabled.
