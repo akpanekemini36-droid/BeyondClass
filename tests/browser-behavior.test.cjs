@@ -51,7 +51,7 @@ test('Ultra checkout carries its currency, amount and lesson terms into the bank
   assert.equal(get('bankSelectedAmount').textContent, get('summaryPrice').textContent);
   assert.equal(get('transferAmount').value, 490000);
   assert.equal(get('transferPlan').textContent, 'Ultra');
-  assert.match(get('summaryDetail').textContent, /Four private 90-minute lessons per week/);
+  assert.match(get('summaryDetail').textContent, /Five private 90-minute lessons per week: 20 lessons and 30 hours every four weeks/);
   assert.equal(get('checkoutContact').href, 'contact.html?plan=Ultra#contact');
   assert.match(get('bankTransferHeading').textContent, /OPay/);
 
