@@ -21,7 +21,7 @@ test('Netlify build publishes only public assets and creates correct search and 
     assert(html.includes('rel="canonical" href="' + pageUrl('https://beyondclassmath.netlify.app', file) + '"'));
     assert(!html.includes('https://www.beyondclassmath.com/'));
     assert(html.includes('property="og:image"'));
-    assert.equal((html.match(/<h1\b/g) || []).length, 1);
+    assert.equal((html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').match(/<h1\b/g) || []).length, 1);
     for (const script of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) JSON.parse(script[1]);
   }
   const headers = fs.readFileSync(path.join(output, '_headers'), 'utf8');

@@ -7,7 +7,18 @@
   NODE_VERSION = "22"
 
 [build.processing]
-  skip_processing = true
+  skip_processing = false
+
+[build.processing.js]
+  bundle = false
+  minify = false
+
+[build.processing.css]
+  bundle = false
+  minify = false
+
+[build.processing.html]
+  pretty_urls = false
 
 [functions]
   node_bundler = "esbuild"
